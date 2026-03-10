@@ -1,5 +1,3 @@
-// frontend/lib/api.ts
-
 export type CartItem = {
   sku: string;
   name: string;
@@ -23,12 +21,17 @@ const API_BASE =
 
 export async function sendChat(
   sessionId: string,
-  message: string
+  message: string,
+  storeSlug: string
 ): Promise<ChatResponse> {
   const res = await fetch(`${API_BASE}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ session_id: sessionId, message }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      message,
+      store_slug: storeSlug,
+    }),
     cache: "no-store",
   });
 

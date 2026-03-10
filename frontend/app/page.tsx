@@ -1,6 +1,5 @@
-// Naija House fresh deploy
-import ChatWindow from "../components/ChatWindow";
+import { redirect } from "next/navigation";
 
-export default function Page() {
-  return <ChatWindow />;
+export default function HomePage() {
+  redirect("/store/naija-house");
 }

@@ -7,9 +7,25 @@ import ProductList from "./ProductList";
 
 type Msg = { role: "user" | "assistant"; text: string };
 
-function getSessionId(): string {
+const STORE_CONFIG: Record<
+  string,
+  { name: string; phone: string; opening: string }
+> = {
+  "naija-house": {
+    name: "Naija House",
+    phone: "07543494001",
+    opening: "Monday – Sunday",
+  },
+  "global-food-market": {
+    name: "Global Food Market",
+    phone: "07466600834",
+    opening: "Monday – Sunday",
+  },
+};
+
+function getSessionId(storeSlug: string): string {
   if (typeof window === "undefined") return "server";
-  const k = "gfm_session_id";
+  const k = `session_id_${storeSlug}`;
   let v = localStorage.getItem(k);
   if (!v) {
     v = Math.random().toString(36).slice(2) + Date.now().toString(36);
@@ -18,21 +34,31 @@ function getSessionId(): string {
   return v;
 }
 
-export default function ChatWindow() {
+export default function ChatWindow({
+  storeSlug = "naija-house",
+}: {
+  storeSlug?: string;
+}) {
+  const store = STORE_CONFIG[storeSlug] ?? STORE_CONFIG["naija-house"];
+
   const [sessionId, setSessionId] = useState<string>("");
   const [messages, setMessages] = useState<Msg[]>([
     {
       role: "assistant",
       text:
-        "Hi 👋\n" +
-        "Welcome to Naija House.\n" +
-        "Contact: 07543494001\n\n" +
-        "Tell me what you want to buy. Example: '2 indomie onion and rice 5kg'.",
+        `Hi 👋\n` +
+        `Welcome to ${store.name}.\n` +
+        `Contact: ${store.phone}\n\n` +
+        `Tell me what you want to buy. Example: '2 indomie onion and rice 5kg'.`,
     },
   ]);
 
   const [input, setInput] = useState("");
-  const [cart, setCart] = useState<{ items: any[]; total: number; status: string } | null>({
+  const [cart, setCart] = useState<{
+    items: any[];
+    total: number;
+    status: string;
+  } | null>({
     items: [],
     total: 0,
     status: "draft",
@@ -42,8 +68,27 @@ export default function ChatWindow() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    setSessionId(getSessionId());
-  }, []);
+    setSessionId(getSessionId(storeSlug));
+  }, [storeSlug]);
+
+  useEffect(() => {
+    setMessages([
+      {
+        role: "assistant",
+        text:
+          `Hi 👋\n` +
+          `Welcome to ${store.name}.\n` +
+          `Contact: ${store.phone}\n\n` +
+          `Tell me what you want to buy. Example: '2 indomie onion and rice 5kg'.`,
+      },
+    ]);
+    setCart({
+      items: [],
+      total: 0,
+      status: "draft",
+    });
+    setInput("");
+  }, [store.name, store.phone]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -62,7 +107,7 @@ export default function ChatWindow() {
     setBusy(true);
 
     try {
-      const res = await sendChat(sessionId, clean);
+      const res = await sendChat(sessionId, clean, storeSlug);
       setMessages((m) => [...m, { role: "assistant", text: res.reply }]);
       if (res.cart) setCart(res.cart);
     } catch (e: any) {
@@ -70,7 +115,7 @@ export default function ChatWindow() {
         ...m,
         {
           role: "assistant",
-          text: "Sorry — API error. Please try again in a moment.",
+          text: "Sorry — API temporarily unavailable. Please try again.",
         },
       ]);
     } finally {
@@ -87,7 +132,6 @@ export default function ChatWindow() {
 
   return (
     <div style={{ maxWidth: 1200, margin: "0 auto", padding: 18 }}>
-      {/* Store Header Bar */}
       <div
         style={{
           display: "flex",
@@ -99,16 +143,15 @@ export default function ChatWindow() {
         }}
       >
         <div>
-          <div style={{ fontSize: 18, fontWeight: 800 }}>Naija House</div>
+          <div style={{ fontSize: 18, fontWeight: 800 }}>{store.name}</div>
           <div style={{ fontSize: 12, opacity: 0.7 }}>Smart AI Ordering</div>
         </div>
 
         <div style={{ fontSize: 12, opacity: 0.7 }}>
-          Open • Monday – Sunday • 07543494001
+          Open • {store.opening} • {store.phone}
         </div>
       </div>
 
-      {/* Title Row */}
       <div style={{ marginBottom: 14 }}>
         <div
           style={{
@@ -117,9 +160,15 @@ export default function ChatWindow() {
             alignItems: "baseline",
           }}
         >
-          <div style={{ fontSize: 22, fontWeight: 900 }}>
-            Naija House — Chat Order
+          <div>
+            <div style={{ fontSize: 22, fontWeight: 900 }}>
+              {store.name} — Chat Order
+            </div>
+            <div style={{ fontSize: 11, opacity: 0.6 }}>
+              Store slug: {storeSlug}
+            </div>
           </div>
+
           <div style={{ fontSize: 12, opacity: 0.7 }}>
             Session: {sessionId ? sessionId.slice(0, 8) : "..."}
           </div>
@@ -253,7 +302,6 @@ export default function ChatWindow() {
         </div>
       </div>
 
-      {/* Footer */}
       <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 24 }}>
         Powered by 1stkings AI •{" "}
         <a
