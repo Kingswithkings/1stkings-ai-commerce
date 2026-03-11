@@ -13,6 +13,11 @@ def _conn():
     return con
 
 
+def _column_exists(cur, table_name: str, column_name: str) -> bool:
+    rows = cur.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return any(row["name"] == column_name for row in rows)
+
+
 def init_db():
     con = _conn()
     cur = con.cursor()
@@ -51,6 +56,24 @@ def init_db():
     );
     """)
 
+    # Add store_slug to existing tables if missing
+    if not _column_exists(cur, "messages", "store_slug"):
+        cur.execute("ALTER TABLE messages ADD COLUMN store_slug TEXT NOT NULL DEFAULT 'naija-house'")
+
+    if not _column_exists(cur, "orders", "store_slug"):
+        cur.execute("ALTER TABLE orders ADD COLUMN store_slug TEXT NOT NULL DEFAULT 'naija-house'")
+
+    if not _column_exists(cur, "user_state", "store_slug"):
+        cur.execute("ALTER TABLE user_state ADD COLUMN store_slug TEXT NOT NULL DEFAULT 'naija-house'")
+
+    # Helpful indexes
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_store_slug ON messages(store_slug)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_orders_session_id ON orders(session_id)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_orders_store_slug ON orders(store_slug)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)")
+    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_state_store_slug ON user_state(store_slug)")
+
     con.commit()
     con.close()
 
@@ -59,50 +82,64 @@ def now_iso():
     return datetime.utcnow().isoformat(timespec="seconds")
 
 
-def log_message(session_id: str, role: str, text: str):
+def log_message(session_id: str, role: str, text: str, store_slug: str = "naija-house"):
     con = _conn()
     cur = con.cursor()
     cur.execute(
-        "INSERT INTO messages(session_id, role, text, created_at) VALUES(?,?,?,?)",
-        (session_id, role, text, now_iso())
+        "INSERT INTO messages(session_id, role, text, created_at, store_slug) VALUES(?,?,?,?,?)",
+        (session_id, role, text, now_iso(), store_slug)
     )
     con.commit()
     con.close()
 
 
-def get_state(session_id: str) -> tuple[str, dict]:
+def get_state(session_id: str, store_slug: str = "naija-house") -> tuple[str, dict]:
     con = _conn()
     cur = con.cursor()
-    row = cur.execute("SELECT state, context FROM user_state WHERE session_id=?", (session_id,)).fetchone()
+    row = cur.execute(
+        "SELECT state, context FROM user_state WHERE session_id=? AND store_slug=?",
+        (session_id, store_slug)
+    ).fetchone()
     con.close()
     if not row:
         return "browsing", {}
     return row["state"], json.loads(row["context"])
 
 
-def set_state(session_id: str, state: str, context: dict):
+def set_state(session_id: str, state: str, context: dict, store_slug: str = "naija-house"):
     con = _conn()
     cur = con.cursor()
-    cur.execute("""
-    INSERT INTO user_state(session_id, state, context, updated_at)
-    VALUES(?,?,?,?)
-    ON CONFLICT(session_id) DO UPDATE SET
-      state=excluded.state,
-      context=excluded.context,
-      updated_at=excluded.updated_at
-    """, (session_id, state, json.dumps(context), now_iso()))
+
+    existing = cur.execute(
+        "SELECT session_id FROM user_state WHERE session_id=? AND store_slug=?",
+        (session_id, store_slug)
+    ).fetchone()
+
+    if existing:
+        cur.execute("""
+            UPDATE user_state
+            SET state=?, context=?, updated_at=?
+            WHERE session_id=? AND store_slug=?
+        """, (state, json.dumps(context), now_iso(), session_id, store_slug))
+    else:
+        cur.execute("""
+            INSERT INTO user_state(session_id, state, context, updated_at, store_slug)
+            VALUES(?,?,?,?,?)
+        """, (session_id, state, json.dumps(context), now_iso(), store_slug))
+
     con.commit()
     con.close()
 
 
-def get_or_create_draft_order(session_id: str) -> dict:
+def get_or_create_draft_order(session_id: str, store_slug: str = "naija-house") -> dict:
     con = _conn()
     cur = con.cursor()
+
     row = cur.execute("""
         SELECT * FROM orders
-        WHERE session_id=? AND status IN ('draft','checkout')
+        WHERE session_id=? AND store_slug=? AND status IN ('draft','checkout')
         ORDER BY id DESC LIMIT 1
-    """, (session_id,)).fetchone()
+    """, (session_id, store_slug)).fetchone()
 
     if row:
         con.close()
@@ -110,10 +147,11 @@ def get_or_create_draft_order(session_id: str) -> dict:
 
     ts = now_iso()
     cur.execute("""
-        INSERT INTO orders(session_id, items, status, created_at, updated_at)
-        VALUES(?,?,?,?,?)
-    """, (session_id, json.dumps([]), "draft", ts, ts))
+        INSERT INTO orders(session_id, items, status, created_at, updated_at, store_slug)
+        VALUES(?,?,?,?,?,?)
+    """, (session_id, json.dumps([]), "draft", ts, ts, store_slug))
     con.commit()
+
     order_id = cur.lastrowid
     row2 = cur.execute("SELECT * FROM orders WHERE id=?", (order_id,)).fetchone()
     con.close()
@@ -123,6 +161,7 @@ def get_or_create_draft_order(session_id: str) -> dict:
 def update_order(order_id: int, **fields):
     if not fields:
         return
+
     con = _conn()
     cur = con.cursor()
 
@@ -142,3 +181,15 @@ def get_order(order_id: int) -> dict | None:
     row = cur.execute("SELECT * FROM orders WHERE id=?", (order_id,)).fetchone()
     con.close()
     return dict(row) if row else None
+
+
+def list_orders_by_store(store_slug: str) -> list[dict]:
+    con = _conn()
+    cur = con.cursor()
+    rows = cur.execute("""
+        SELECT * FROM orders
+        WHERE store_slug=?
+        ORDER BY id DESC
+    """, (store_slug,)).fetchall()
+    con.close()
+    return [dict(row) for row in rows]

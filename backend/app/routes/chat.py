@@ -29,8 +29,8 @@ def get_catalog_for_store(store_slug: str) -> Catalog:
 def chat(req: ChatRequest):
     catalog = get_catalog_for_store(req.store_slug)
 
-    log_message(req.session_id, "user", req.message)
-    result = handle_chat(req.session_id, req.message, catalog)
-    log_message(req.session_id, "assistant", result["reply"])
+    log_message(req.session_id, "user", req.message, req.store_slug)
+    result = handle_chat(req.session_id, req.message, catalog, req.store_slug)
+    log_message(req.session_id, "assistant", result["reply"], req.store_slug)
 
     return result

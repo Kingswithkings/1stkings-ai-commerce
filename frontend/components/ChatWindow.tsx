@@ -9,22 +9,25 @@ type Msg = { role: "user" | "assistant"; text: string };
 
 const STORE_CONFIG: Record<
   string,
-  { name: string; phone: string; opening: string }
+  { name: string; phone: string; opening: string; example: string }
 > = {
   "naija-house": {
     name: "Naija House",
     phone: "07543494001",
     opening: "Monday – Sunday",
+    example: "2 indomie onion and rice 5kg",
   },
   "global-food-market": {
     name: "Global Food Market",
     phone: "07466600834",
     opening: "Monday – Sunday",
+    example: "2 indomie onion and rice 5kg",
   },
   "najeebullah": {
     name: "Najeebullah",
     phone: "+44 7462638297",
     opening: "Monday – Sunday",
+    example: "2 phone chargers, 1 toilet brush and 1 frying pan",
   },
 };
 
@@ -54,7 +57,7 @@ export default function ChatWindow({
         `Hi 👋\n` +
         `Welcome to ${store.name}.\n` +
         `Contact: ${store.phone}\n\n` +
-        `Tell me what you want to buy. Example: '2 indomie onion and rice 5kg'.`,
+        `Tell me what you want to buy. Example: '${store.example}'.`,
     },
   ]);
 
@@ -84,7 +87,7 @@ export default function ChatWindow({
           `Hi 👋\n` +
           `Welcome to ${store.name}.\n` +
           `Contact: ${store.phone}\n\n` +
-          `Tell me what you want to buy. Example: '2 indomie onion and rice 5kg'.`,
+          `Tell me what you want to buy. Example: '${store.example}'.`,
       },
     ]);
     setCart({
@@ -93,7 +96,7 @@ export default function ChatWindow({
       status: "draft",
     });
     setInput("");
-  }, [store.name, store.phone]);
+  }, [store.name, store.phone, store.example]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -264,7 +267,7 @@ export default function ChatWindow({
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => (e.key === "Enter" ? onSend() : null)}
-                  placeholder="Type your order… (e.g., 2 indomie onion and rice 5kg)"
+                  placeholder={`Type your order… (e.g., ${store.example})`}
                   style={{
                     flex: 1,
                     padding: "12px 12px",
@@ -293,7 +296,7 @@ export default function ChatWindow({
               </div>
 
               <div style={{ marginTop: 10, fontSize: 12, opacity: 0.75, color: "#e8eefc" }}>
-                Tips: <b>show cart</b> • <b>remove rice</b> • <b>checkout</b>
+                Tips: <b>show cart</b> • <b>remove item</b> • <b>checkout</b>
               </div>
             </div>
 

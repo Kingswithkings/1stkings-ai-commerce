@@ -1,6 +1,12 @@
 import json
 from typing import Any
-from app.db import get_or_create_draft_order, update_order, get_order, get_state, set_state
+from app.db import (
+    get_or_create_draft_order,
+    update_order,
+    get_order,
+    get_state,
+    set_state,
+)
 from app.catalog import Catalog
 
 
@@ -26,7 +32,6 @@ def cart_totals(items: list[dict]) -> tuple[float, list[dict]]:
 
 
 def add_items_to_cart(order_id: int, cart_items: list[dict], new_items: list[dict]) -> list[dict]:
-    # merge by sku
     by_sku = {i["sku"]: i for i in cart_items}
     for n in new_items:
         sku = n["sku"]
@@ -41,10 +46,6 @@ def add_items_to_cart(order_id: int, cart_items: list[dict], new_items: list[dic
 
 
 def decrement_from_cart(order_id: int, cart_items: list[dict], query: str, dec: int = 1) -> tuple[list[dict], bool, str]:
-    """
-    Decrements quantity by `dec` for the first cart item whose name contains query.
-    Removes the item if qty becomes <= 0.
-    """
     q = (query or "").lower().strip()
     if not q:
         return cart_items, False, "Tell me what to remove (e.g., 'remove rice')."
@@ -77,9 +78,9 @@ def decrement_from_cart(order_id: int, cart_items: list[dict], query: str, dec: 
     return cart_items, False, "I couldn’t find that item in your cart."
 
 
-def handle_chat(session_id: str, user_text: str, catalog: Catalog) -> dict[str, Any]:
-    state, ctx = get_state(session_id)
-    order = get_or_create_draft_order(session_id)
+def handle_chat(session_id: str, user_text: str, catalog: Catalog, store_slug: str = "naija-house") -> dict[str, Any]:
+    state, ctx = get_state(session_id, store_slug)
+    order = get_or_create_draft_order(session_id, store_slug)
     order_id = int(order["id"])
     items = _load_items(order)
 
@@ -89,45 +90,59 @@ def handle_chat(session_id: str, user_text: str, catalog: Catalog) -> dict[str, 
     # State machine for checkout fields
     if state == "checkout_wait_pickup_time":
         update_order(order_id, pickup_time=text, status="checkout")
-        set_state(session_id, "checkout_wait_name", {"order_id": order_id})
+        set_state(session_id, "checkout_wait_name", {"order_id": order_id}, store_slug)
         return _reply_with_cart(order_id, items, "Nice. What’s your name?")
 
     if state == "checkout_wait_name":
         update_order(order_id, customer_name=text)
-        set_state(session_id, "checkout_wait_phone", {"order_id": order_id})
+        set_state(session_id, "checkout_wait_phone", {"order_id": order_id}, store_slug)
         return _reply_with_cart(order_id, items, "Thanks. What phone number should we contact you on?")
 
     if state == "checkout_wait_phone":
         update_order(order_id, customer_phone=text)
-        set_state(session_id, "checkout_confirm", {"order_id": order_id})
+        set_state(session_id, "checkout_confirm", {"order_id": order_id}, store_slug)
         total, enriched = cart_totals(items)
+        current_order = get_order(order_id)
         return {
-            "reply": f"Confirm your pickup order ✅\nName: {get_order(order_id).get('customer_name')}\nPhone: {text}\nPickup: {get_order(order_id).get('pickup_time')}\nTotal: £{total}\nReply YES to confirm or CANCEL to stop.",
+            "reply": (
+                f"Confirm your pickup order ✅\n"
+                f"Name: {current_order.get('customer_name')}\n"
+                f"Phone: {text}\n"
+                f"Pickup: {current_order.get('pickup_time')}\n"
+                f"Total: £{total}\n"
+                f"Reply YES to confirm or CANCEL to stop."
+            ),
             "cart": {"items": enriched, "total": total, "status": "checkout"},
             "needs_admin": False,
-            "order_id": order_id
+            "order_id": order_id,
         }
 
     if state == "checkout_confirm":
         if t_low in ["yes", "y", "confirm", "ok", "okay", "ok confirm", "confirm yes"]:
             update_order(order_id, status="confirmed")
-            set_state(session_id, "browsing", {})
+            set_state(session_id, "browsing", {}, store_slug)
             total, enriched = cart_totals(items)
+            current_order = get_order(order_id)
             return {
-                "reply": f"Order confirmed ✅ (Order #{order_id})\nPickup: {get_order(order_id).get('pickup_time')}\nTotal: £{total}\nWe’ll notify you when it’s ready.",
+                "reply": (
+                    f"Order confirmed ✅ (Order #{order_id})\n"
+                    f"Pickup: {current_order.get('pickup_time')}\n"
+                    f"Total: £{total}\n"
+                    f"We’ll notify you when it’s ready."
+                ),
                 "cart": {"items": enriched, "total": total, "status": "confirmed"},
                 "needs_admin": False,
-                "order_id": order_id
+                "order_id": order_id,
             }
 
         if "cancel" in t_low:
             update_order(order_id, status="cancelled")
-            set_state(session_id, "browsing", {})
+            set_state(session_id, "browsing", {}, store_slug)
             return {
                 "reply": "Cancelled. If you want to start again, just type what you need.",
                 "cart": None,
                 "needs_admin": False,
-                "order_id": order_id
+                "order_id": order_id,
             }
 
         total, enriched = cart_totals(items)
@@ -135,49 +150,50 @@ def handle_chat(session_id: str, user_text: str, catalog: Catalog) -> dict[str, 
             "reply": f"Reply YES to confirm or CANCEL to stop. Total £{total}.",
             "cart": {"items": enriched, "total": total, "status": "checkout"},
             "needs_admin": False,
-            "order_id": order_id
+            "order_id": order_id,
         }
 
     # Normal intents
     from app.nlu import detect_intent, extract_items, parse_remove_command
+
     intent = detect_intent(text)
 
     if intent == "VIEW_CART":
         total, enriched = cart_totals(items)
         if not items:
             return {
-                "reply": "Your cart is empty. Type what you want to buy (e.g., '2 indomie onion').",
+                "reply": "Your cart is empty. Type what you want to buy.",
                 "cart": {"items": [], "total": 0.0, "status": "draft"},
                 "needs_admin": False,
-                "order_id": order_id
+                "order_id": order_id,
             }
         return {
             "reply": f"Here’s your cart 🛒 Total £{total}. Type CHECKOUT to finish.",
             "cart": {"items": enriched, "total": total, "status": order["status"]},
             "needs_admin": False,
-            "order_id": order_id
+            "order_id": order_id,
         }
 
     if intent == "CHECKOUT":
         if not items:
             return {
-                "reply": "Your cart is empty. Add items first (e.g., 'rice 5kg and palm oil').",
+                "reply": "Your cart is empty. Add items first.",
                 "cart": {"items": [], "total": 0.0, "status": "draft"},
                 "needs_admin": False,
-                "order_id": order_id
+                "order_id": order_id,
             }
-        set_state(session_id, "checkout_wait_pickup_time", {"order_id": order_id})
+        set_state(session_id, "checkout_wait_pickup_time", {"order_id": order_id}, store_slug)
         update_order(order_id, status="checkout")
         return _reply_with_cart(order_id, items, "Great. What pickup time do you want? (e.g., Today 6pm)")
 
     if intent == "CANCEL":
         update_order(order_id, status="cancelled")
-        set_state(session_id, "browsing", {})
+        set_state(session_id, "browsing", {}, store_slug)
         return {
             "reply": "Cancelled. If you want to start again, type what you need.",
             "cart": None,
             "needs_admin": False,
-            "order_id": order_id
+            "order_id": order_id,
         }
 
     if intent == "REMOVE":
@@ -190,17 +206,17 @@ def handle_chat(session_id: str, user_text: str, catalog: Catalog) -> dict[str, 
                 "reply": f"{msg} Try: 'remove rice' or 'remove 2 rice'.",
                 "cart": {"items": enriched, "total": total, "status": order["status"]},
                 "needs_admin": False,
-                "order_id": order_id
+                "order_id": order_id,
             }
 
         return {
             "reply": f"{msg} New total £{total}.",
             "cart": {"items": enriched, "total": total, "status": order["status"]},
             "needs_admin": False,
-            "order_id": order_id
+            "order_id": order_id,
         }
 
-    # ADD_OR_SEARCH (main)
+    # ADD_OR_SEARCH
     parsed = extract_items(text)
     matched_new = []
     needs_admin = False
@@ -231,7 +247,7 @@ def handle_chat(session_id: str, user_text: str, catalog: Catalog) -> dict[str, 
             "name": prod.name,
             "qty": int(p.qty),
             "unit": prod.unit,
-            "unit_price": float(prod.price)
+            "unit_price": float(prod.price),
         })
 
     if flagged:
@@ -247,24 +263,24 @@ def handle_chat(session_id: str, user_text: str, catalog: Catalog) -> dict[str, 
             "reply": "I need a bit more detail:\n- " + "\n- ".join(clarifications) + "\n\nOr type 'show cart' / 'checkout'.",
             "cart": {"items": enriched, "total": total, "status": order["status"]},
             "needs_admin": True,
-            "order_id": order_id
+            "order_id": order_id,
         }
 
     note = ("\n\nNotes:\n- " + "\n- ".join(clarifications)) if clarifications else ""
 
     if not items:
         return {
-            "reply": "Tell me what you want to buy (e.g., '2 indomie onion and rice 5kg').",
+            "reply": "Tell me what you want to buy.",
             "cart": {"items": [], "total": 0.0, "status": "draft"},
             "needs_admin": False,
-            "order_id": order_id
+            "order_id": order_id,
         }
 
     return {
         "reply": f"Added ✅. Cart total £{total}. Type 'show cart' or 'checkout' to finish.{note}",
         "cart": {"items": enriched, "total": total, "status": order["status"]},
         "needs_admin": bool(flagged),
-        "order_id": order_id
+        "order_id": order_id,
     }
 
 
@@ -274,5 +290,5 @@ def _reply_with_cart(order_id: int, items: list[dict], msg: str) -> dict:
         "reply": msg,
         "cart": {"items": enriched, "total": total, "status": get_order(order_id)["status"]},
         "needs_admin": False,
-        "order_id": order_id
+        "order_id": order_id,
     }
