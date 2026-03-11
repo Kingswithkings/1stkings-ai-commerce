@@ -21,6 +21,11 @@ const STORE_CONFIG: Record<
     phone: "07466600834",
     opening: "Monday – Sunday",
   },
+  "najeebullah": {
+    name: "Najeebullah",
+    phone: "+44 7462638297",
+    opening: "Monday – Sunday",
+  },
 };
 
 function getSessionId(storeSlug: string): string {
@@ -110,7 +115,7 @@ export default function ChatWindow({
       const res = await sendChat(sessionId, clean, storeSlug);
       setMessages((m) => [...m, { role: "assistant", text: res.reply }]);
       if (res.cart) setCart(res.cart);
-    } catch (e: any) {
+    } catch {
       setMessages((m) => [
         ...m,
         {
@@ -186,6 +191,7 @@ export default function ChatWindow({
           }}
         >
           <ProductList
+            storeSlug={storeSlug}
             busy={busy}
             height={470}
             onPlus={(name: string) => {

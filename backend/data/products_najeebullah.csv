@@ -1,0 +1,56 @@
+sku,name,aliases,price,unit,in_stock,category
+HOME001,Storage Basket,"basket, storage basket, home basket",4.99,each,20,Home Essentials
+HOME002,Plastic Drawer Organiser,"drawer organiser, organizer tray",3.49,each,15,Home Essentials
+HOME003,Laundry Basket,"laundry basket, clothes basket",7.99,each,10,Home Essentials
+HOME004,Wall Hooks,"hooks, wall hooks, hanging hooks",2.99,pack,25,Home Essentials
+HOME005,Door Mat,"mat, doormat, door mat",6.99,each,12,Home Essentials
+
+KIT001,Frying Pan,"pan, frying pan",12.99,each,8,Kitchen
+KIT002,Cooking Pot Set,"pot set, cooking pots, saucepan set",24.99,set,5,Kitchen
+KIT003,Kitchen Knife Set,"knife set, kitchen knives",9.99,set,10,Kitchen
+KIT004,Chopping Board,"board, chopping board",3.99,each,18,Kitchen
+KIT005,Food Storage Container,"container, food container, storage container",2.49,each,30,Kitchen
+KIT006,Plate Set,"plates, plate set, dishes",14.99,set,7,Kitchen
+KIT007,Cup Set,"cups, mugs, cup set",8.99,set,10,Kitchen
+KIT008,Spoon Set,"spoons, cutlery, spoon set",4.99,set,20,Kitchen
+KIT009,Electric Kettle,"kettle, electric kettle",16.99,each,6,Kitchen
+KIT010,Dish Rack,"dish rack, plate rack",7.99,each,9,Kitchen
+
+LIV001,Throw Pillow,"pillow, cushion, throw pillow",5.99,each,14,Living Room
+LIV002,Sofa Cover,"sofa cover, couch cover",18.99,each,6,Living Room
+LIV003,Curtains,"curtain, window curtain",12.99,set,8,Living Room
+LIV004,LED Lamp,"lamp, led lamp, bedside lamp",9.99,each,10,Living Room
+LIV005,Small Rug,"rug, carpet, small rug",10.99,each,9,Living Room
+
+BAT001,Bath Mat,"bath mat, bathroom mat",5.49,each,14,Bathroom
+BAT002,Toilet Brush,"toilet brush, wc brush",2.99,each,25,Bathroom
+BAT003,Shower Curtain,"shower curtain, bathroom curtain",6.99,each,10,Bathroom
+BAT004,Soap Dispenser,"soap dispenser, hand soap bottle",3.99,each,16,Bathroom
+BAT005,Toothbrush Holder,"toothbrush holder, brush holder",2.49,each,20,Bathroom
+BAT006,Bucket,"bucket, water bucket",4.99,each,18,Bathroom
+BAT007,Mop Bucket,"mop bucket, cleaning bucket",7.49,each,10,Bathroom
+
+SMK001,Lighter,"lighter, gas lighter",1.49,each,40,Smoking Accessories
+SMK002,Ashtray,"ash tray, ashtray",2.99,each,15,Smoking Accessories
+SMK003,Rolling Paper,"rolling paper, cigarette paper",1.99,pack,30,Smoking Accessories
+SMK004,Shisha Charcoal,"charcoal, hookah charcoal, shisha coal",4.99,pack,12,Smoking Accessories
+SMK005,Shisha Pipe,"shisha pipe, hookah pipe",12.99,each,5,Smoking Accessories
+
+MOB001,Phone Charger,"charger, phone charger, usb charger",6.99,each,20,Mobile Accessories
+MOB002,USB Cable,"cable, usb cable, charging cable",3.99,each,30,Mobile Accessories
+MOB003,Type-C Cable,"type c cable, usb-c cable",4.49,each,25,Mobile Accessories
+MOB004,iPhone Cable,"iphone cable, lightning cable",5.49,each,20,Mobile Accessories
+MOB005,Phone Case,"phone case, mobile case",4.99,each,35,Mobile Accessories
+MOB006,Screen Protector,"screen protector, tempered glass",3.49,each,40,Mobile Accessories
+MOB007,Earphones,"earphones, headphones",7.99,each,15,Mobile Accessories
+MOB008,Power Bank,"power bank, portable charger",14.99,each,8,Mobile Accessories
+MOB009,Car Charger,"car charger, usb car adapter",5.99,each,12,Mobile Accessories
+MOB010,Phone Holder,"phone holder, mobile stand",4.49,each,18,Mobile Accessories
+
+BRU001,Hair Brush,"hair brush, brush",2.99,each,22,Brushes & Cleaning
+BRU002,Dusting Brush,"dust brush, dusting brush",3.49,each,15,Brushes & Cleaning
+BRU003,Scrubbing Brush,"scrub brush, cleaning brush",2.49,each,20,Brushes & Cleaning
+BRU004,Broom,"broom, sweeping broom",5.99,each,14,Brushes & Cleaning
+BRU005,Mop,"mop, floor mop",7.99,each,10,Brushes & Cleaning
+BRU006,Hand Brush and Pan,"dustpan set, brush and pan",4.49,set,16,Brushes & Cleaning
+BRU007,Floor Wiper,"wiper, floor wiper, squeegee",6.49,each,12,Brushes & Cleaning

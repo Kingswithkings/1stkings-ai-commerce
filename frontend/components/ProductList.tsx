@@ -9,25 +9,31 @@ export default function ProductList({
   onMinus,
   busy,
   height = 230,
+  storeSlug,
 }: {
   onPlus: (productName: string) => void;
   onMinus: (productName: string) => void;
   busy?: boolean;
   height?: number;
+  storeSlug: string;
 }) {
   const [products, setProducts] = useState<Product[]>([]);
   const [q, setQ] = useState("");
   const [activeCat, setActiveCat] = useState<string>("All");
 
   useEffect(() => {
-    fetchProducts().then(setProducts).catch(() => setProducts([]));
-  }, []);
+    fetchProducts(storeSlug).then(setProducts).catch(() => setProducts([]));
+  }, [storeSlug]);
 
-  // Build category list from products (no extra API needed)
   const categories = useMemo(() => {
     const cats = Array.from(
-      new Set((products || []).map((p) => (p.category || "Uncategorized").trim() || "Uncategorized"))
+      new Set(
+        (products || []).map(
+          (p) => (p.category || "Uncategorized").trim() || "Uncategorized"
+        )
+      )
     ).sort((a, b) => a.localeCompare(b));
+
     return ["All", ...cats];
   }, [products]);
 
@@ -44,12 +50,20 @@ export default function ProductList({
 
   return (
     <div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          marginBottom: 10,
+        }}
+      >
         <div style={{ fontWeight: 900, color: "#e8eefc" }}>Products</div>
-        <div style={{ fontSize: 12, opacity: 0.75, color: "#e8eefc" }}>{products.length} items</div>
+        <div style={{ fontSize: 12, opacity: 0.75, color: "#e8eefc" }}>
+          {products.length} items
+        </div>
       </div>
 
-      {/* Category chips */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
         {categories.map((c) => {
           const active = activeCat === c;
@@ -91,7 +105,6 @@ export default function ProductList({
         }}
       />
 
-      {/* Scrollable list */}
       <div
         style={{
           maxHeight: height,
@@ -104,6 +117,7 @@ export default function ProductList({
       >
         {filtered.map((p) => {
           const cat = (p.category || "Uncategorized").trim() || "Uncategorized";
+
           return (
             <div
               key={p.sku}
@@ -114,7 +128,14 @@ export default function ProductList({
                 border: "1px solid #1d2b4a",
               }}
             >
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, color: "#e8eefc" }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 10,
+                  color: "#e8eefc",
+                }}
+              >
                 <div style={{ fontWeight: 650 }}>
                   {p.name}
                   <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>{cat}</div>
@@ -126,7 +147,6 @@ export default function ProductList({
                 Unit: {p.unit} • Stock: {p.in_stock > 0 ? p.in_stock : "Out"}
               </div>
 
-              {/* +/- controls */}
               <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end", gap: 8 }}>
                 <button
                   disabled={busy}

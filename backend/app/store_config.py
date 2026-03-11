@@ -13,4 +13,11 @@ STORES = {
         "opening": "Monday – Sunday",
         "products_file": "data/products_global_food_market.csv",
     },
+    "najeebullah": {
+        "slug": "najeebullah",
+        "name": "Najeebullah",
+        "phone": "+44 7462638297",
+        "opening": "Monday – Sunday",
+        "products_file": "data/products_najeebullah.csv",
+    },
 }
