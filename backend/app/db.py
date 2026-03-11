@@ -26,9 +26,10 @@ def init_db():
     CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT NOT NULL,
-        role TEXT NOT NULL, -- 'user' | 'assistant'
+        role TEXT NOT NULL,
         text TEXT NOT NULL,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        store_slug TEXT NOT NULL DEFAULT 'naija-house'
     );
     """)
 
@@ -36,37 +37,29 @@ def init_db():
     CREATE TABLE IF NOT EXISTS orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT NOT NULL,
-        items TEXT NOT NULL,          -- JSON list
-        status TEXT NOT NULL,         -- draft|checkout|confirmed|cancelled
+        items TEXT NOT NULL,
+        status TEXT NOT NULL,
         pickup_time TEXT,
         customer_name TEXT,
         customer_phone TEXT,
         flagged INTEGER NOT NULL DEFAULT 0,
         created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
+        updated_at TEXT NOT NULL,
+        store_slug TEXT NOT NULL DEFAULT 'naija-house'
     );
     """)
 
     cur.execute("""
     CREATE TABLE IF NOT EXISTS user_state (
-        session_id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        store_slug TEXT NOT NULL DEFAULT 'naija-house',
         state TEXT NOT NULL,
-        context TEXT NOT NULL,  -- JSON
-        updated_at TEXT NOT NULL
+        context TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (session_id, store_slug)
     );
     """)
 
-    # Add store_slug to existing tables if missing
-    if not _column_exists(cur, "messages", "store_slug"):
-        cur.execute("ALTER TABLE messages ADD COLUMN store_slug TEXT NOT NULL DEFAULT 'naija-house'")
-
-    if not _column_exists(cur, "orders", "store_slug"):
-        cur.execute("ALTER TABLE orders ADD COLUMN store_slug TEXT NOT NULL DEFAULT 'naija-house'")
-
-    if not _column_exists(cur, "user_state", "store_slug"):
-        cur.execute("ALTER TABLE user_state ADD COLUMN store_slug TEXT NOT NULL DEFAULT 'naija-house'")
-
-    # Helpful indexes
     cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_store_slug ON messages(store_slug)")
     cur.execute("CREATE INDEX IF NOT EXISTS idx_orders_session_id ON orders(session_id)")
@@ -110,22 +103,14 @@ def set_state(session_id: str, state: str, context: dict, store_slug: str = "nai
     con = _conn()
     cur = con.cursor()
 
-    existing = cur.execute(
-        "SELECT session_id FROM user_state WHERE session_id=? AND store_slug=?",
-        (session_id, store_slug)
-    ).fetchone()
-
-    if existing:
-        cur.execute("""
-            UPDATE user_state
-            SET state=?, context=?, updated_at=?
-            WHERE session_id=? AND store_slug=?
-        """, (state, json.dumps(context), now_iso(), session_id, store_slug))
-    else:
-        cur.execute("""
-            INSERT INTO user_state(session_id, state, context, updated_at, store_slug)
-            VALUES(?,?,?,?,?)
-        """, (session_id, state, json.dumps(context), now_iso(), store_slug))
+    cur.execute("""
+        INSERT INTO user_state(session_id, store_slug, state, context, updated_at)
+        VALUES(?,?,?,?,?)
+        ON CONFLICT(session_id, store_slug) DO UPDATE SET
+            state=excluded.state,
+            context=excluded.context,
+            updated_at=excluded.updated_at
+    """, (session_id, store_slug, state, json.dumps(context), now_iso()))
 
     con.commit()
     con.close()
