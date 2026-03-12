@@ -11,6 +11,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
+        "https://1stkings-ai-commerce.vercel.app",
         "https://global-food-webbot-cdaf.vercel.app",
         "https://naija-house-webbotapp.vercel.app",
         "https://naija-house-webbot.vercel.app",
