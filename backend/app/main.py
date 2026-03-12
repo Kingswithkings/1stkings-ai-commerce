@@ -21,6 +21,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def root():
+    return {"message": "1stkings AI Commerce API is live"}
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+
 app.include_router(products_router)
 app.include_router(chat_router)
 app.include_router(admin_router)
