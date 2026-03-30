@@ -13,7 +13,20 @@ def get_catalog_for_store(store_slug: str) -> Catalog:
         raise HTTPException(status_code=404, detail=f"Unknown store: {store_slug}")
 
     csv_path = Path(__file__).resolve().parents[2] / store["products_file"]
-    return Catalog(csv_path=csv_path)
+
+    if not csv_path.exists():
+        raise HTTPException(
+            status_code=500,
+            detail=f"CSV file not found for store '{store_slug}': {csv_path}"
+        )
+
+    try:
+        return Catalog(csv_path=csv_path)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to load catalog for store '{store_slug}': {str(e)}"
+        )
 
 
 @router.get("/products")
