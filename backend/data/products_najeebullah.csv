@@ -1,56 +1,58 @@
-sku,name,aliases,price,unit,in_stock,category
-HOME001,Storage Basket,"basket, storage basket, home basket",4.99,each,20,Home Essentials
-HOME002,Plastic Drawer Organiser,"drawer organiser, organizer tray",3.49,each,15,Home Essentials
-HOME003,Laundry Basket,"laundry basket, clothes basket",7.99,each,10,Home Essentials
-HOME004,Wall Hooks,"hooks, wall hooks, hanging hooks",2.99,pack,25,Home Essentials
-HOME005,Door Mat,"mat, doormat, door mat",6.99,each,12,Home Essentials
-
-KIT001,Frying Pan,"pan, frying pan",12.99,each,8,Kitchen
-KIT002,Cooking Pot Set,"pot set, cooking pots, saucepan set",24.99,set,5,Kitchen
-KIT003,Kitchen Knife Set,"knife set, kitchen knives",9.99,set,10,Kitchen
-KIT004,Chopping Board,"board, chopping board",3.99,each,18,Kitchen
-KIT005,Food Storage Container,"container, food container, storage container",2.49,each,30,Kitchen
-KIT006,Plate Set,"plates, plate set, dishes",14.99,set,7,Kitchen
-KIT007,Cup Set,"cups, mugs, cup set",8.99,set,10,Kitchen
-KIT008,Spoon Set,"spoons, cutlery, spoon set",4.99,set,20,Kitchen
-KIT009,Electric Kettle,"kettle, electric kettle",16.99,each,6,Kitchen
-KIT010,Dish Rack,"dish rack, plate rack",7.99,each,9,Kitchen
-
-LIV001,Throw Pillow,"pillow, cushion, throw pillow",5.99,each,14,Living Room
-LIV002,Sofa Cover,"sofa cover, couch cover",18.99,each,6,Living Room
-LIV003,Curtains,"curtain, window curtain",12.99,set,8,Living Room
-LIV004,LED Lamp,"lamp, led lamp, bedside lamp",9.99,each,10,Living Room
-LIV005,Small Rug,"rug, carpet, small rug",10.99,each,9,Living Room
-
-BAT001,Bath Mat,"bath mat, bathroom mat",5.49,each,14,Bathroom
-BAT002,Toilet Brush,"toilet brush, wc brush",2.99,each,25,Bathroom
-BAT003,Shower Curtain,"shower curtain, bathroom curtain",6.99,each,10,Bathroom
-BAT004,Soap Dispenser,"soap dispenser, hand soap bottle",3.99,each,16,Bathroom
-BAT005,Toothbrush Holder,"toothbrush holder, brush holder",2.49,each,20,Bathroom
-BAT006,Bucket,"bucket, water bucket",4.99,each,18,Bathroom
-BAT007,Mop Bucket,"mop bucket, cleaning bucket",7.49,each,10,Bathroom
-
-SMK001,Lighter,"lighter, gas lighter",1.49,each,40,Smoking Accessories
-SMK002,Ashtray,"ash tray, ashtray",2.99,each,15,Smoking Accessories
-SMK003,Rolling Paper,"rolling paper, cigarette paper",1.99,pack,30,Smoking Accessories
-SMK004,Shisha Charcoal,"charcoal, hookah charcoal, shisha coal",4.99,pack,12,Smoking Accessories
-SMK005,Shisha Pipe,"shisha pipe, hookah pipe",12.99,each,5,Smoking Accessories
-
-MOB001,Phone Charger,"charger, phone charger, usb charger",6.99,each,20,Mobile Accessories
-MOB002,USB Cable,"cable, usb cable, charging cable",3.99,each,30,Mobile Accessories
-MOB003,Type-C Cable,"type c cable, usb-c cable",4.49,each,25,Mobile Accessories
-MOB004,iPhone Cable,"iphone cable, lightning cable",5.49,each,20,Mobile Accessories
-MOB005,Phone Case,"phone case, mobile case",4.99,each,35,Mobile Accessories
-MOB006,Screen Protector,"screen protector, tempered glass",3.49,each,40,Mobile Accessories
-MOB007,Earphones,"earphones, headphones",7.99,each,15,Mobile Accessories
-MOB008,Power Bank,"power bank, portable charger",14.99,each,8,Mobile Accessories
-MOB009,Car Charger,"car charger, usb car adapter",5.99,each,12,Mobile Accessories
-MOB010,Phone Holder,"phone holder, mobile stand",4.49,each,18,Mobile Accessories
-
-BRU001,Hair Brush,"hair brush, brush",2.99,each,22,Brushes & Cleaning
-BRU002,Dusting Brush,"dust brush, dusting brush",3.49,each,15,Brushes & Cleaning
-BRU003,Scrubbing Brush,"scrub brush, cleaning brush",2.49,each,20,Brushes & Cleaning
-BRU004,Broom,"broom, sweeping broom",5.99,each,14,Brushes & Cleaning
-BRU005,Mop,"mop, floor mop",7.99,each,10,Brushes & Cleaning
-BRU006,Hand Brush and Pan,"dustpan set, brush and pan",4.49,set,16,Brushes & Cleaning
-BRU007,Floor Wiper,"wiper, floor wiper, squeegee",6.49,each,12,Brushes & Cleaning
+sku,name,aliases,price,unit,in_stock
+0143,Drinking Tea Glass - 0143,"tea glass,drinking tea glass,glass 0143",2.5,each,True
+0144,Drinking Tea Glass - 0144,"tea glass,drinking tea glass,glass 0144",2.5,each,True
+0145,Drinking Tea Glass - 0145,"tea glass,drinking tea glass,glass 0145",2.7,each,True
+JX-ZB11-0146,Drinking Tea Glass - JX-ZB11 - 0146,"tea glass,drinking tea glass,jx-zb11",2.01,each,True
+0191,Glass Ash Tray Large 1202,"ash tray,glass ash tray large",1.3,each,True
+0192,Glass Ash Tray Small 0192,"ash tray,glass ash tray small",0.51,each,True
+0151,Drinking Water Glass - 0151,"water glass,drinking water glass",4.0,each,True
+0862,Drinking Water Glass - 0862,"water glass,drinking water glass 0862",3.0,each,True
+0861,Drinking Water Glass - 0861,"water glass,drinking water glass 0861",4.0,each,True
+BMJ-6014BHT,Glass Water Jug Set - BMJ-6014BHT,"water jug set,glass water jug",7.0,each,True
+4099,Food Container Round 1.75L - White,"food container round 1.75l,white bowl container",0.7,each,True
+4085,Food Container 3pack 600ml 1200ml 2000ml - Black,"food container 3 pack,black food container",1.5,each,True
+0666,Toilet Brush - 0666,"toilet brush,bathroom brush",1.0,each,True
+Y-440,Toilet Brush - Y-440,"toilet brush y440,bathroom brush",1.0,each,True
+10-1,Carpet Brush,"carpet brush,floor brush",0.7,each,True
+LOTA,Lota,"lota,water lota",1.2,each,True
+LOTA-LN,Lota Long Nose,"lota long nose,long nose lota",1.2,each,True
+KIDS-CHAIR-PLASTIC,Chair for Kids Plastic,"kids chair,plastic chair for kids",2.4,each,True
+1312,Dustpan and Brush 1312,"dustpan and brush,dust pan",0.76,each,True
+DUSTPAN-ELITE,Dustpan and Brush ELITE,"dustpan and brush elite,dust pan",2.5,each,True
+GB-R-L,Gift Basket Rectangle Large,"gift basket rectangle large,basket",2.5,each,True
+GB-R-S,Gift Basket Rectangle Small,"gift basket rectangle small,basket",1.2,each,True
+SWING-BIN-S,Swing Bin Small,"swing bin small,bin",2.0,each,True
+DC-MJ-1.5L,DC - Measuring Jug 1.5L,"measuring jug 1.5l,jug",0.4,each,True
+DC-MJ-2L,DC - Measuring Jug 2L,"measuring jug 2l,jug",0.5,each,True
+LAUNDRY-BASKET,Laundry Basket,"laundry basket,clothes basket",3.0,each,True
+VAC-FLASK-2L-BLK,Vacuum Flask 2L Black,"vacuum flask 2l black,flask",7.5,each,True
+295E,Swing Bin 50L Mixed,"swing bin 50l,mixed bin",5.0,each,True
+FC-SUPER-12L,Food Container SUPER 12000ml / 12L,"food container super 12l,container 12000ml",2.0,each,True
+FC-SUPER-18L,Food Container SUPER 18000ml / 18L,"food container super 18l,container 18000ml",3.0,each,True
+FC-SUPER-7.5L,Food Container SUPER 7500ml / 7.5L,"food container super 7.5l,container 7500ml",1.5,each,True
+DC-BASIN-10,DC - Basin - 10in,"basin 10,bowl basin",0.55,each,True
+DC-BASIN-12,DC - Basin - 12in,"basin 12,bowl basin",0.7,each,True
+DC-BASIN-14,DC - Basin - 14in,"basin 14,bowl basin",1.2,each,True
+DC-BASIN-16,DC - Basin - 16in,"basin 16,bowl basin",1.6,each,True
+DC-BASIN-18,DC - Basin - 18in,"basin 18,bowl basin",2.2,each,True
+DC-BASIN-20,DC - Basin - 20in,"basin 20,bowl basin",2.8,each,True
+DC-BASIN-JUMBO,DC - Basin - JUMBO,"basin jumbo,bowl basin",3.51,each,True
+0684,Kitchenware - Grater-4-Face--0684,"grater 4 face,kitchen grater",1.2,each,True
+0690,Kitchenware - Whisk Medium - 0690,"whisk medium,kitchen whisk",0.8,each,True
+0680,Kitchenware - Whisk Small - 0680,"whisk small,kitchen whisk",0.6,each,True
+CUP-SAUCER-GIFT-1,Drinking Cups and Saucers Gift Set,cups and saucers gift set,4.0,each,True
+CERAMIC-TEA-CUP-SAUCER,Drinking Ceramic Tea Cups and Saucers Gift Set,ceramic tea cups and saucers gift set,6.0,each,True
+TEAPOT-1.5L,Tea Pot 1.5L,"tea pot 1.5l,teapot",4.0,each,True
+TEAPOT-2L,Tea Pot 2L,"tea pot 2l,teapot",5.0,each,True
+TEAPOT-3L,Tea Pot 3L,"tea pot 3l,teapot",6.0,each,True
+TEAPOT-4L,Tea Pot 4L,"tea pot 4l,teapot",7.0,each,True
+GLASS-TEAPOT-1000,Glass Tea Pot 1000ml,"glass tea pot 1000ml,teapot",3.5,each,True
+GLASS-TEAPOT-1800,Glass Tea Pot 1800ml,"glass tea pot 1800ml,teapot",5.0,each,True
+0414,Steel Tray 30cm,"steel tray 30cm,tray",1.0,each,True
+0414-40,Steel Tray 40cm,"steel tray 40cm,tray",1.5,each,True
+0415,Steel Tray 50cm,"steel tray 50cm,tray",2.0,each,True
+0094,Chair Baby Chair Metal,"baby chair metal,chair",3.0,each,True
+0005,Ball - Jumping Ball,"jumping ball,ball",2.01,each,True
+KITCHEN-BASKET-4F-R,Kitchen-Basket-4-Floor Round,"kitchen basket 4 floor round,rack",4.5,each,True
+KITCHEN-BASKET-4F-RECT,Kitchen Basket 4 Floor Rectangle,"kitchen basket 4 floor rectangle,rack",5.0,each,True
+ZZ-ITEM-10,ZZ Unlisted Item 10 sweet bowl,"sweet bowl,zz unlisted item 10",3.0,each,True
