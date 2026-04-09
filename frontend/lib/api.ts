@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "./config";
+
 export type CartItem = {
   sku: string;
   name: string;
@@ -25,8 +27,7 @@ export type StoreChannelConfig = {
   };
 };
 
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+export const API_BASE = API_BASE_URL;
 
 export async function sendChat(
   sessionId: string,

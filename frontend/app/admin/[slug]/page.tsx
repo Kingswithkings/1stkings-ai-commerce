@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { API_BASE_URL } from "../../../lib/config";
 
 type Order = {
   id: number;
@@ -16,10 +17,7 @@ type Order = {
   updated_at: string;
 };
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_BASE ??
-  "http://127.0.0.1:8000";
+const API_BASE = API_BASE_URL;
 
 function parseItems(items: string) {
   try {

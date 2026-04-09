@@ -1,5 +1,7 @@
 // frontend/lib/products.ts
 
+import { API_BASE_URL } from "./config";
+
 export type Product = {
   sku: string;
   name: string;
@@ -10,10 +12,7 @@ export type Product = {
   category: string;
 };
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_BASE ??
-  "http://127.0.0.1:8000";
+const API_BASE = API_BASE_URL;
 
 export async function fetchProducts(storeSlug: string): Promise<Product[]> {
   const res = await fetch(
