@@ -1,180 +1,415 @@
-import sqlite3
 import json
-from datetime import datetime
-from pathlib import Path
+from contextlib import contextmanager
+from datetime import datetime, timezone
 
-BASE_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = BASE_DIR / "store.db"
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import declarative_base, sessionmaker
 
+from app.config import get_settings
 
-def _conn():
-    con = sqlite3.connect(DB_PATH, check_same_thread=False)
-    con.row_factory = sqlite3.Row
-    return con
+DATABASE_URL = get_settings().database_url
 
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False},
+)
 
-def _column_exists(cur, table_name: str, column_name: str) -> bool:
-    rows = cur.execute(f"PRAGMA table_info({table_name})").fetchall()
-    return any(row["name"] == column_name for row in rows)
-
-
-def init_db():
-    con = _conn()
-    cur = con.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS messages (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id TEXT NOT NULL,
-        role TEXT NOT NULL,
-        text TEXT NOT NULL,
-        created_at TEXT NOT NULL,
-        store_slug TEXT NOT NULL DEFAULT 'naija-house'
-    );
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS orders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        session_id TEXT NOT NULL,
-        items TEXT NOT NULL,
-        status TEXT NOT NULL,
-        pickup_time TEXT,
-        customer_name TEXT,
-        customer_phone TEXT,
-        flagged INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        store_slug TEXT NOT NULL DEFAULT 'naija-house'
-    );
-    """)
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS user_state (
-        session_id TEXT NOT NULL,
-        store_slug TEXT NOT NULL DEFAULT 'naija-house',
-        state TEXT NOT NULL,
-        context TEXT NOT NULL,
-        updated_at TEXT NOT NULL,
-        PRIMARY KEY (session_id, store_slug)
-    );
-    """)
-
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_session_id ON messages(session_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_messages_store_slug ON messages(store_slug)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_orders_session_id ON orders(session_id)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_orders_store_slug ON orders(store_slug)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)")
-    cur.execute("CREATE INDEX IF NOT EXISTS idx_user_state_store_slug ON user_state(store_slug)")
-
-    con.commit()
-    con.close()
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
 
-def now_iso():
-    return datetime.utcnow().isoformat(timespec="seconds")
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
-def log_message(session_id: str, role: str, text: str, store_slug: str = "naija-house"):
-    con = _conn()
-    cur = con.cursor()
-    cur.execute(
-        "INSERT INTO messages(session_id, role, text, created_at, store_slug) VALUES(?,?,?,?,?)",
-        (session_id, role, text, now_iso(), store_slug)
-    )
-    con.commit()
-    con.close()
+@contextmanager
+def db_conn():
+    with engine.begin() as conn:
+        yield conn
 
 
-def get_state(session_id: str, store_slug: str = "naija-house") -> tuple[str, dict]:
-    con = _conn()
-    cur = con.cursor()
-    row = cur.execute(
-        "SELECT state, context FROM user_state WHERE session_id=? AND store_slug=?",
-        (session_id, store_slug)
-    ).fetchone()
-    con.close()
-    if not row:
-        return "browsing", {}
-    return row["state"], json.loads(row["context"])
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
-def set_state(session_id: str, state: str, context: dict, store_slug: str = "naija-house"):
-    con = _conn()
-    cur = con.cursor()
-
-    cur.execute("""
-        INSERT INTO user_state(session_id, store_slug, state, context, updated_at)
-        VALUES(?,?,?,?,?)
-        ON CONFLICT(session_id, store_slug) DO UPDATE SET
-            state=excluded.state,
-            context=excluded.context,
-            updated_at=excluded.updated_at
-    """, (session_id, store_slug, state, json.dumps(context), now_iso()))
-
-    con.commit()
-    con.close()
+def _column_names(table_name: str) -> set[str]:
+    with engine.connect() as conn:
+        rows = conn.execute(text(f"PRAGMA table_info({table_name})"))
+        return {row[1] for row in rows}
 
 
-def get_or_create_draft_order(session_id: str, store_slug: str = "naija-house") -> dict:
-    con = _conn()
-    cur = con.cursor()
+def ensure_schema():
+    with db_conn() as conn:
+        existing_tables = {
+            row[0]
+            for row in conn.execute(
+                text("SELECT name FROM sqlite_master WHERE type='table'")
+            )
+        }
 
-    row = cur.execute("""
-        SELECT * FROM orders
-        WHERE session_id=? AND store_slug=? AND status IN ('draft','checkout')
-        ORDER BY id DESC LIMIT 1
-    """, (session_id, store_slug)).fetchone()
+        if "orders" not in existing_tables:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE orders (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        session_id TEXT NOT NULL,
+                        items TEXT NOT NULL DEFAULT '[]',
+                        status TEXT NOT NULL DEFAULT 'draft',
+                        pickup_time TEXT,
+                        customer_name TEXT,
+                        customer_phone TEXT,
+                        flagged INTEGER NOT NULL DEFAULT 0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        store_slug TEXT NOT NULL DEFAULT 'naija-house',
+                        channel TEXT NOT NULL DEFAULT 'web'
+                    )
+                    """
+                ),
+            )
 
-    if row:
-        con.close()
-        return dict(row)
+        if "user_state" not in existing_tables:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE user_state (
+                        session_id TEXT NOT NULL,
+                        store_slug TEXT NOT NULL DEFAULT 'naija-house',
+                        state TEXT NOT NULL,
+                        context TEXT NOT NULL DEFAULT '{}',
+                        updated_at TEXT NOT NULL,
+                        channel TEXT NOT NULL DEFAULT 'web',
+                        PRIMARY KEY (session_id, store_slug, channel)
+                    )
+                    """
+                ),
+            )
 
-    ts = now_iso()
-    cur.execute("""
-        INSERT INTO orders(session_id, items, status, created_at, updated_at, store_slug)
-        VALUES(?,?,?,?,?,?)
-    """, (session_id, json.dumps([]), "draft", ts, ts, store_slug))
-    con.commit()
+        if "messages" not in existing_tables:
+            conn.execute(
+                text(
+                    """
+                    CREATE TABLE messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        session_id TEXT NOT NULL,
+                        role TEXT NOT NULL,
+                        text TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        store_slug TEXT NOT NULL DEFAULT 'naija-house',
+                        channel TEXT NOT NULL DEFAULT 'web'
+                    )
+                    """
+                ),
+            )
 
-    order_id = cur.lastrowid
-    row2 = cur.execute("SELECT * FROM orders WHERE id=?", (order_id,)).fetchone()
-    con.close()
-    return dict(row2)
+        store_columns = _column_names("stores") if "stores" in existing_tables else set()
+        if "whatsapp_number" not in store_columns:
+            conn.execute(text("ALTER TABLE stores ADD COLUMN whatsapp_number VARCHAR"))
+        if "whatsapp_enabled" not in store_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE stores ADD COLUMN whatsapp_enabled BOOLEAN NOT NULL DEFAULT 0"
+                )
+            )
+        if "whatsapp_provider" not in store_columns:
+            conn.execute(
+                text(
+                    "ALTER TABLE stores ADD COLUMN whatsapp_provider VARCHAR NOT NULL DEFAULT 'meta'"
+                )
+            )
+        if "whatsapp_phone_number_id" not in store_columns:
+            conn.execute(
+                text("ALTER TABLE stores ADD COLUMN whatsapp_phone_number_id VARCHAR")
+            )
+        if "whatsapp_bot_id" not in store_columns:
+            conn.execute(text("ALTER TABLE stores ADD COLUMN whatsapp_bot_id VARCHAR"))
+        if "whatsapp_verify_token" not in store_columns:
+            conn.execute(text("ALTER TABLE stores ADD COLUMN whatsapp_verify_token VARCHAR"))
 
+        order_columns = _column_names("orders")
+        if "channel" not in order_columns:
+            conn.execute(
+                text("ALTER TABLE orders ADD COLUMN channel TEXT NOT NULL DEFAULT 'web'")
+            )
 
-def update_order(order_id: int, **fields):
-    if not fields:
-        return
+        state_columns = _column_names("user_state")
+        if "channel" not in state_columns:
+            conn.execute(
+                text("ALTER TABLE user_state ADD COLUMN channel TEXT NOT NULL DEFAULT 'web'")
+            )
 
-    con = _conn()
-    cur = con.cursor()
+        message_columns = _column_names("messages")
+        if "channel" not in message_columns:
+            conn.execute(
+                text("ALTER TABLE messages ADD COLUMN channel TEXT NOT NULL DEFAULT 'web'")
+            )
 
-    fields["updated_at"] = now_iso()
-    cols = ", ".join([f"{k}=?" for k in fields.keys()])
-    vals = list(fields.values())
-    vals.append(order_id)
-
-    cur.execute(f"UPDATE orders SET {cols} WHERE id=?", vals)
-    con.commit()
-    con.close()
+        conn.execute(
+            text(
+                "UPDATE stores SET whatsapp_number = phone WHERE whatsapp_number IS NULL"
+            )
+        )
+        conn.execute(
+            text(
+                """
+                UPDATE stores
+                SET whatsapp_enabled = 1
+                WHERE COALESCE(TRIM(whatsapp_number), '') <> ''
+                """
+            )
+        )
 
 
 def get_order(order_id: int) -> dict | None:
-    con = _conn()
-    cur = con.cursor()
-    row = cur.execute("SELECT * FROM orders WHERE id=?", (order_id,)).fetchone()
-    con.close()
-    return dict(row) if row else None
+    with engine.connect() as conn:
+        row = conn.execute(
+            text("SELECT * FROM orders WHERE id = :order_id"),
+            {"order_id": order_id},
+        ).mappings().first()
+        return dict(row) if row else None
+
+
+def get_or_create_draft_order(
+    session_id: str,
+    store_slug: str,
+    channel: str = "web",
+) -> dict:
+    with db_conn() as conn:
+        row = conn.execute(
+            text(
+                """
+                SELECT * FROM orders
+                WHERE session_id = :session_id
+                  AND store_slug = :store_slug
+                  AND channel = :channel
+                  AND status IN ('draft', 'checkout')
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ),
+            {
+                "session_id": session_id,
+                "store_slug": store_slug,
+                "channel": channel,
+            },
+        ).mappings().first()
+
+        if row:
+            return dict(row)
+
+        now = _now()
+        conn.execute(
+            text(
+                """
+                INSERT INTO orders (
+                    session_id, items, status, pickup_time, customer_name,
+                    customer_phone, flagged, created_at, updated_at, store_slug, channel
+                ) VALUES (
+                    :session_id, '[]', 'draft', NULL, NULL,
+                    NULL, 0, :created_at, :updated_at, :store_slug, :channel
+                )
+                """
+            ),
+            {
+                "session_id": session_id,
+                "created_at": now,
+                "updated_at": now,
+                "store_slug": store_slug,
+                "channel": channel,
+            },
+        )
+
+        created = conn.execute(
+            text(
+                """
+                SELECT * FROM orders
+                WHERE session_id = :session_id
+                  AND store_slug = :store_slug
+                  AND channel = :channel
+                ORDER BY id DESC
+                LIMIT 1
+                """
+            ),
+            {
+                "session_id": session_id,
+                "store_slug": store_slug,
+                "channel": channel,
+            },
+        ).mappings().first()
+
+        return dict(created)
+
+
+def update_order(order_id: int, **fields) -> dict | None:
+    if not fields:
+        return get_order(order_id)
+
+    allowed = {
+        "items",
+        "status",
+        "pickup_time",
+        "customer_name",
+        "customer_phone",
+        "flagged",
+        "channel",
+    }
+    updates = {key: value for key, value in fields.items() if key in allowed}
+    if not updates:
+        return get_order(order_id)
+
+    updates["updated_at"] = _now()
+    set_parts = [f"{key} = :{key}" for key in updates]
+    updates["order_id"] = order_id
+
+    with db_conn() as conn:
+        conn.execute(
+            text(
+                f"UPDATE orders SET {', '.join(set_parts)} WHERE id = :order_id"
+            ),
+            updates,
+        )
+
+    return get_order(order_id)
+
+
+def get_state(session_id: str, store_slug: str, channel: str = "web") -> tuple[str, dict]:
+    with engine.connect() as conn:
+        row = conn.execute(
+            text(
+                """
+                SELECT state, context
+                FROM user_state
+                WHERE session_id = :session_id
+                  AND store_slug = :store_slug
+                  AND channel = :channel
+                """
+            ),
+            {
+                "session_id": session_id,
+                "store_slug": store_slug,
+                "channel": channel,
+            },
+        ).first()
+
+    if not row:
+        return "browsing", {}
+
+    try:
+        ctx = json.loads(row[1] or "{}")
+    except json.JSONDecodeError:
+        ctx = {}
+    return row[0], ctx
+
+
+def set_state(session_id: str, state: str, context: dict, store_slug: str, channel: str = "web"):
+    payload = json.dumps(context or {})
+    now = _now()
+    with db_conn() as conn:
+        existing = conn.execute(
+            text(
+                """
+                SELECT 1
+                FROM user_state
+                WHERE session_id = :session_id
+                  AND store_slug = :store_slug
+                  AND channel = :channel
+                """
+            ),
+            {
+                "session_id": session_id,
+                "store_slug": store_slug,
+                "channel": channel,
+            },
+        ).first()
+
+        if existing:
+            conn.execute(
+                text(
+                    """
+                    UPDATE user_state
+                    SET state = :state, context = :context, updated_at = :updated_at
+                    WHERE session_id = :session_id
+                      AND store_slug = :store_slug
+                      AND channel = :channel
+                    """
+                ),
+                {
+                    "session_id": session_id,
+                    "store_slug": store_slug,
+                    "channel": channel,
+                    "state": state,
+                    "context": payload,
+                    "updated_at": now,
+                },
+            )
+            return
+
+        conn.execute(
+            text(
+                """
+                INSERT INTO user_state (
+                    session_id, store_slug, state, context, updated_at, channel
+                ) VALUES (
+                    :session_id, :store_slug, :state, :context, :updated_at, :channel
+                )
+                """
+            ),
+            {
+                "session_id": session_id,
+                "store_slug": store_slug,
+                "channel": channel,
+                "state": state,
+                "context": payload,
+                "updated_at": now,
+            },
+        )
+
+
+def log_message(
+    session_id: str,
+    role: str,
+    message_text: str,
+    store_slug: str,
+    channel: str = "web",
+):
+    with db_conn() as conn:
+        conn.execute(
+            text(
+                """
+                INSERT INTO messages (
+                    session_id, role, text, created_at, store_slug, channel
+                ) VALUES (
+                    :session_id, :role, :text, :created_at, :store_slug, :channel
+                )
+                """
+            ),
+            {
+                "session_id": session_id,
+                "role": role,
+                "text": message_text,
+                "created_at": _now(),
+                "store_slug": store_slug,
+                "channel": channel,
+            },
+        )
 
 
 def list_orders_by_store(store_slug: str) -> list[dict]:
-    con = _conn()
-    cur = con.cursor()
-    rows = cur.execute("""
-        SELECT * FROM orders
-        WHERE store_slug=?
-        ORDER BY id DESC
-    """, (store_slug,)).fetchall()
-    con.close()
-    return [dict(row) for row in rows]
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT *
+                FROM orders
+                WHERE store_slug = :store_slug
+                ORDER BY updated_at DESC, id DESC
+                """
+            ),
+            {"store_slug": store_slug},
+        ).mappings().all()
+        return [dict(row) for row in rows]

@@ -1,47 +1,45 @@
 from fastapi import APIRouter, HTTPException, Query
-from pathlib import Path
+from sqlalchemy.orm import Session
 
-from app.catalog import Catalog
-from app.store_config import STORES
+from app.db import SessionLocal
+from app.models import Store, Product
 
 router = APIRouter()
 
 
-def get_catalog_for_store(store_slug: str) -> Catalog:
-    store = STORES.get(store_slug)
-    if not store:
-        raise HTTPException(status_code=404, detail=f"Unknown store: {store_slug}")
-
-    csv_path = Path(__file__).resolve().parents[2] / store["products_file"]
-
-    if not csv_path.exists():
-        raise HTTPException(
-            status_code=500,
-            detail=f"CSV file not found for store '{store_slug}': {csv_path}"
-        )
-
-    try:
-        return Catalog(csv_path=csv_path)
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to load catalog for store '{store_slug}': {str(e)}"
-        )
-
-
 @router.get("/products")
-def list_products(store_slug: str = Query("naija-house")):
-    catalog = get_catalog_for_store(store_slug)
+def list_products(store_slug: str = Query(...)):
+    db: Session = SessionLocal()
+    try:
+        store = db.query(Store).filter(Store.slug == store_slug).first()
+        if not store:
+            raise HTTPException(status_code=404, detail=f"Unknown store: {store_slug}")
 
-    return [
-        {
-            "sku": p.sku,
-            "name": p.name,
-            "price": p.price,
-            "unit": p.unit,
-            "in_stock": p.in_stock,
-            "aliases": p.aliases,
-            "category": getattr(p, "category", None) or "Uncategorized",
-        }
-        for p in catalog.products
-    ]
+        products = (
+            db.query(Product)
+            .filter(Product.store_id == store.id, Product.is_active == True)
+            .order_by(Product.name.asc())
+            .all()
+        )
+
+        return [
+            {
+                "id": p.id,
+                "sku": p.sku,
+                "name": p.name,
+                "price": p.price,
+                "unit": p.unit,
+                "stock_qty": p.stock_qty,
+                "in_stock": p.in_stock,
+                "aliases": [a.strip() for a in (p.aliases or "").split(",") if a.strip()],
+                "category": p.category or "Uncategorized",
+                "image_url": p.image_url,
+                "description": p.description,
+                "is_active": p.is_active,
+                "min_stock_level": p.min_stock_level,
+                "low_stock": p.stock_qty <= p.min_stock_level if p.min_stock_level > 0 else False,
+            }
+            for p in products
+        ]
+    finally:
+        db.close()

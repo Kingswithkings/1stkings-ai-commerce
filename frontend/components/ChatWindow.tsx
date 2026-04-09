@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { sendChat } from "../lib/api";
+import { fetchStoreChannelConfig, sendChat, type StoreChannelConfig } from "../lib/api";
 import CartPanel from "./CartPanel";
 import ProductList from "./ProductList";
 
@@ -73,10 +73,27 @@ export default function ChatWindow({
   });
 
   const [busy, setBusy] = useState(false);
+  const [channelConfig, setChannelConfig] = useState<StoreChannelConfig | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setSessionId(getSessionId(storeSlug));
+  }, [storeSlug]);
+
+  useEffect(() => {
+    let active = true;
+
+    fetchStoreChannelConfig(storeSlug)
+      .then((data) => {
+        if (active) setChannelConfig(data);
+      })
+      .catch(() => {
+        if (active) setChannelConfig(null);
+      });
+
+    return () => {
+      active = false;
+    };
   }, [storeSlug]);
 
   useEffect(() => {
@@ -182,6 +199,49 @@ export default function ChatWindow({
           </div>
         </div>
       </div>
+
+      {channelConfig?.whatsapp.enabled && channelConfig.whatsapp.link ? (
+        <div
+          style={{
+            marginBottom: 14,
+            padding: 16,
+            borderRadius: 14,
+            border: "1px solid #1d2b4a",
+            background:
+              "linear-gradient(135deg, rgba(11,19,36,1) 0%, rgba(11,52,38,0.95) 100%)",
+          }}
+        >
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ fontSize: 18, fontWeight: 900 }}>WhatsApp AI Ordering</div>
+              <div style={{ fontSize: 13, opacity: 0.8, maxWidth: 720, marginTop: 4 }}>
+                Customers can place and confirm orders in WhatsApp using the same AI order flow as this web app.
+              </div>
+            </div>
+
+            <a
+              href={channelConfig.whatsapp.link}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                alignSelf: "center",
+                textDecoration: "none",
+                background: "#25D366",
+                color: "#08110b",
+                padding: "12px 16px",
+                borderRadius: 999,
+                fontWeight: 900,
+              }}
+            >
+              Open WhatsApp
+            </a>
+          </div>
+
+          <div style={{ fontSize: 12, opacity: 0.75, marginTop: 10 }}>
+            WhatsApp number: {channelConfig.whatsapp.number}
+          </div>
+        </div>
+      ) : null}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14 }}>
         <div

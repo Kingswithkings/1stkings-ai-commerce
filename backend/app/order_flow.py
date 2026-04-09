@@ -78,9 +78,15 @@ def decrement_from_cart(order_id: int, cart_items: list[dict], query: str, dec: 
     return cart_items, False, "I couldn’t find that item in your cart."
 
 
-def handle_chat(session_id: str, user_text: str, catalog: Catalog, store_slug: str = "naija-house") -> dict[str, Any]:
-    state, ctx = get_state(session_id, store_slug)
-    order = get_or_create_draft_order(session_id, store_slug)
+def handle_chat(
+    session_id: str,
+    user_text: str,
+    catalog: Catalog,
+    store_slug: str = "naija-house",
+    channel: str = "web",
+) -> dict[str, Any]:
+    state, ctx = get_state(session_id, store_slug, channel)
+    order = get_or_create_draft_order(session_id, store_slug, channel)
     order_id = int(order["id"])
     items = _load_items(order)
 
@@ -90,17 +96,35 @@ def handle_chat(session_id: str, user_text: str, catalog: Catalog, store_slug: s
     # State machine for checkout fields
     if state == "checkout_wait_pickup_time":
         update_order(order_id, pickup_time=text, status="checkout")
-        set_state(session_id, "checkout_wait_name", {"order_id": order_id}, store_slug)
+        set_state(session_id, "checkout_wait_name", {"order_id": order_id}, store_slug, channel)
         return _reply_with_cart(order_id, items, "Nice. What’s your name?")
 
     if state == "checkout_wait_name":
         update_order(order_id, customer_name=text)
-        set_state(session_id, "checkout_wait_phone", {"order_id": order_id}, store_slug)
+        if channel == "whatsapp":
+            update_order(order_id, customer_phone=session_id)
+            set_state(session_id, "checkout_confirm", {"order_id": order_id}, store_slug, channel)
+            total, enriched = cart_totals(items)
+            current_order = get_order(order_id)
+            return {
+                "reply": (
+                    f"Confirm your pickup order ✅\n"
+                    f"Name: {current_order.get('customer_name')}\n"
+                    f"Phone: {session_id}\n"
+                    f"Pickup: {current_order.get('pickup_time')}\n"
+                    f"Total: £{total}\n"
+                    f"Reply YES to confirm or CANCEL to stop."
+                ),
+                "cart": {"items": enriched, "total": total, "status": "checkout"},
+                "needs_admin": False,
+                "order_id": order_id,
+            }
+        set_state(session_id, "checkout_wait_phone", {"order_id": order_id}, store_slug, channel)
         return _reply_with_cart(order_id, items, "Thanks. What phone number should we contact you on?")
 
     if state == "checkout_wait_phone":
         update_order(order_id, customer_phone=text)
-        set_state(session_id, "checkout_confirm", {"order_id": order_id}, store_slug)
+        set_state(session_id, "checkout_confirm", {"order_id": order_id}, store_slug, channel)
         total, enriched = cart_totals(items)
         current_order = get_order(order_id)
         return {
@@ -120,7 +144,7 @@ def handle_chat(session_id: str, user_text: str, catalog: Catalog, store_slug: s
     if state == "checkout_confirm":
         if t_low in ["yes", "y", "confirm", "ok", "okay", "ok confirm", "confirm yes"]:
             update_order(order_id, status="confirmed")
-            set_state(session_id, "browsing", {}, store_slug)
+            set_state(session_id, "browsing", {}, store_slug, channel)
             total, enriched = cart_totals(items)
             current_order = get_order(order_id)
             return {
@@ -137,7 +161,7 @@ def handle_chat(session_id: str, user_text: str, catalog: Catalog, store_slug: s
 
         if "cancel" in t_low:
             update_order(order_id, status="cancelled")
-            set_state(session_id, "browsing", {}, store_slug)
+            set_state(session_id, "browsing", {}, store_slug, channel)
             return {
                 "reply": "Cancelled. If you want to start again, just type what you need.",
                 "cart": None,
@@ -182,13 +206,13 @@ def handle_chat(session_id: str, user_text: str, catalog: Catalog, store_slug: s
                 "needs_admin": False,
                 "order_id": order_id,
             }
-        set_state(session_id, "checkout_wait_pickup_time", {"order_id": order_id}, store_slug)
+        set_state(session_id, "checkout_wait_pickup_time", {"order_id": order_id}, store_slug, channel)
         update_order(order_id, status="checkout")
         return _reply_with_cart(order_id, items, "Great. What pickup time do you want? (e.g., Today 6pm)")
 
     if intent == "CANCEL":
         update_order(order_id, status="cancelled")
-        set_state(session_id, "browsing", {}, store_slug)
+        set_state(session_id, "browsing", {}, store_slug, channel)
         return {
             "reply": "Cancelled. If you want to start again, type what you need.",
             "cart": None,

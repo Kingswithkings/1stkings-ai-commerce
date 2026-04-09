@@ -14,10 +14,19 @@ export type ChatResponse = {
   order_id: number;
 };
 
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ??
-  process.env.NEXT_PUBLIC_API_BASE ??
-  "http://127.0.0.1:8000";
+export type StoreChannelConfig = {
+  store_slug: string;
+  store_name: string;
+  phone: string | null;
+  whatsapp: {
+    enabled: boolean;
+    number: string | null;
+    link: string | null;
+  };
+};
+
+export const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
 
 export async function sendChat(
   sessionId: string,
@@ -44,5 +53,30 @@ export async function sendChat(
     cart: data?.cart ?? null,
     needs_admin: Boolean(data?.needs_admin),
     order_id: Number(data?.order_id ?? 0),
+  };
+}
+
+export async function fetchStoreChannelConfig(
+  storeSlug: string
+): Promise<StoreChannelConfig> {
+  const res = await fetch(`${API_BASE}/stores/${storeSlug}/channel-config`, {
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+
+  const data = await res.json();
+
+  return {
+    store_slug: data?.store_slug ?? storeSlug,
+    store_name: data?.store_name ?? storeSlug,
+    phone: data?.phone ?? null,
+    whatsapp: {
+      enabled: Boolean(data?.whatsapp?.enabled),
+      number: data?.whatsapp?.number ?? null,
+      link: data?.whatsapp?.link ?? null,
+    },
   };
 }

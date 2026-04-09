@@ -3,6 +3,9 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from app.db import SessionLocal
+from app.models import Product as DbProduct, Store
+
 @dataclass
 class Product:
     sku: str
@@ -68,3 +71,39 @@ class Catalog:
         scored.sort(key=lambda x: x[1], reverse=True)
         top = scored[0] if scored else (None, 0.0)
         return top[0], float(top[1]), scored[:5]
+
+
+def load_catalog_for_store(store_slug: str) -> Catalog:
+    db = SessionLocal()
+    try:
+        store = db.query(Store).filter(Store.slug == store_slug).first()
+        if not store:
+            raise ValueError(f"Unknown store: {store_slug}")
+
+        products = (
+            db.query(DbProduct)
+            .filter(
+                DbProduct.store_id == store.id,
+                DbProduct.is_active == True,
+                DbProduct.in_stock == True,
+            )
+            .order_by(DbProduct.name.asc())
+            .all()
+        )
+    finally:
+        db.close()
+
+    catalog = Catalog.__new__(Catalog)
+    catalog.products = [
+        Product(
+            sku=product.sku,
+            name=product.name,
+            aliases=[a.strip() for a in (product.aliases or "").split(",") if a.strip()],
+            price=float(product.price),
+            unit=product.unit or "unit",
+            in_stock=int(product.stock_qty or 0),
+            category=product.category or "Uncategorized",
+        )
+        for product in products
+    ]
+    return catalog
