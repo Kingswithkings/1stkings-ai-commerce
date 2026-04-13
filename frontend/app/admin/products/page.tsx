@@ -207,8 +207,78 @@ export default function AdminProductsPage() {
     }));
   };
 
-  const handleImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
+  const resizeImageFile = async (file: File): Promise<File> => {
+    const maxDimension = 640;
+    const outputType = "image/jpeg";
+    const quality = 0.82;
+
+    const drawResizedImage = async (
+      width: number,
+      height: number,
+      draw: (ctx: CanvasRenderingContext2D, width: number, height: number) => void
+    ) => {
+      const scale = Math.min(1, maxDimension / Math.max(width, height));
+      const targetWidth = Math.max(1, Math.round(width * scale));
+      const targetHeight = Math.max(1, Math.round(height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        throw new Error("Canvas is not available");
+      }
+
+      draw(ctx, targetWidth, targetHeight);
+
+      const blob = await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob(resolve, outputType, quality);
+      });
+
+      if (!blob) {
+        throw new Error("Failed to process image");
+      }
+
+      const baseName = file.name.replace(/\.[^.]+$/, "") || "product-image";
+      return new File([blob], `${baseName}.jpg`, {
+        type: outputType,
+        lastModified: Date.now(),
+      });
+    };
+
+    if ("createImageBitmap" in window) {
+      const bitmap = await createImageBitmap(file);
+
+      try {
+        return await drawResizedImage(bitmap.width, bitmap.height, (ctx, width, height) => {
+          ctx.drawImage(bitmap, 0, 0, width, height);
+        });
+      } finally {
+        bitmap.close();
+      }
+    }
+
+    const imageUrl = URL.createObjectURL(file);
+
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const element = new Image();
+        element.onload = () => resolve(element);
+        element.onerror = () => reject(new Error("Failed to load image"));
+        element.src = imageUrl;
+      });
+
+      return await drawResizedImage(image.naturalWidth, image.naturalHeight, (ctx, width, height) => {
+        ctx.drawImage(image, 0, 0, width, height);
+      });
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+    }
+  };
+
+  const handleImageFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const originalFile = event.target.files?.[0] || null;
+    const file = originalFile ? await resizeImageFile(originalFile) : null;
     setSelectedImageFile(file);
     setRemoveImage(false);
 
@@ -371,6 +441,45 @@ export default function AdminProductsPage() {
       fetchProducts();
     } catch (err: any) {
       setError(err.message || "Failed to delete product");
+    }
+  };
+
+  const removeProductImage = async (product: Product) => {
+    if (!product.image_url) return;
+
+    const confirmed = window.confirm(`Remove image for ${product.name}?`);
+    if (!confirmed) return;
+
+    setError("");
+    setSuccess("");
+
+    try {
+      const res = await fetch(`${API_BASE}/admin/products/${product.id}`, {
+        method: "PUT",
+        headers: authHeaders,
+        body: JSON.stringify({ remove_image: true }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to remove image");
+      }
+
+      if (editingProduct?.id === product.id) {
+        setForm((prev) => ({
+          ...prev,
+          image_url: "",
+        }));
+        setSelectedImageFile(null);
+        setSelectedImagePreview("");
+        setRemoveImage(false);
+      }
+
+      setSuccess("Product image removed.");
+      fetchProducts();
+    } catch (err: any) {
+      setError(err.message || "Failed to remove image");
     }
   };
 
@@ -676,7 +785,7 @@ export default function AdminProductsPage() {
             <div className="md:col-span-2 rounded border border-dashed p-4">
               <div className="text-sm font-medium">Upload or snap a product image</div>
               <div className="mt-1 text-xs text-gray-600">
-                Paste an external URL above, or upload directly from your device camera or gallery here.
+                Paste an external URL above, or upload directly from your device camera or gallery here. Photos are resized automatically before upload.
               </div>
 
               <div className="mt-4 flex flex-wrap gap-3">
@@ -760,6 +869,15 @@ export default function AdminProductsPage() {
                 alt="Preview"
                 className="h-12 w-12 object-cover rounded border"
               />
+              {editingProduct && showingExistingImage && (
+                <button
+                  type="button"
+                  onClick={() => removeProductImage(editingProduct)}
+                  className="rounded border px-3 py-1 text-sm text-red-600"
+                >
+                  Delete saved image
+                </button>
+              )}
             </div>
           )}
 
@@ -869,6 +987,15 @@ export default function AdminProductsPage() {
                     >
                       Edit
                     </button>
+
+                    {p.image_url && (
+                      <button
+                        onClick={() => removeProductImage(p)}
+                        className="text-orange-600 text-left"
+                      >
+                        Remove Image
+                      </button>
+                    )}
 
                     <button
                       onClick={() => {
