@@ -5,7 +5,7 @@ from app.security import hash_password
 SEED_ADMINS = [
     {
         "store_slug": "najeebullah",
-        "name": "Najeebullah Owner",
+        "name": "Doncaster Budget Shop Owner",
         "email": "owner@najeebullah.com",
         "password": "Admin123!",
     },

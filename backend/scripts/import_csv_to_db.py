@@ -21,7 +21,7 @@ STORE_FILES = {
         "file": DATA_DIR / "products_global_food_market.csv",
     },
     "najeebullah": {
-        "name": "Najeebullah",
+        "name": "Doncaster Budget Shop",
         "phone": "+44 7462638297",
         "opening": "Monday – Sunday",
         "file": DATA_DIR / "products_najeebullah.csv",

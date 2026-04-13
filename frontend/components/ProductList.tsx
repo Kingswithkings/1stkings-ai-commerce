@@ -117,6 +117,7 @@ export default function ProductList({
       >
         {filtered.map((p) => {
           const cat = (p.category || "Uncategorized").trim() || "Uncategorized";
+          const hasSizePricing = Array.isArray(p.size_pricing) && p.size_pricing.length > 0;
 
           return (
             <div
@@ -140,56 +141,118 @@ export default function ProductList({
                   {p.name}
                   <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>{cat}</div>
                 </div>
-                <div style={{ fontWeight: 900 }}>£{p.price.toFixed(2)}</div>
+                <div style={{ fontWeight: 900 }}>
+                  {hasSizePricing
+                    ? `From £${Math.min(...p.size_pricing.map((option) => option.price)).toFixed(2)}`
+                    : `£${p.price.toFixed(2)}`}
+                </div>
               </div>
 
               <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4, color: "#e8eefc" }}>
                 Unit: {p.unit} • Stock: {p.in_stock > 0 ? p.in_stock : "Out"}
               </div>
 
-              <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button
-                  disabled={busy}
-                  onClick={() => onMinus(p.name)}
-                  style={{
-                    width: 36,
-                    height: 32,
-                    borderRadius: 10,
-                    border: "1px solid #1d2b4a",
-                    background: "#0b1324",
-                    color: "#e8eefc",
-                    cursor: busy ? "not-allowed" : "pointer",
-                    fontWeight: 900,
-                    fontSize: 16,
-                    lineHeight: "32px",
-                  }}
-                  aria-label={`Remove one ${p.name}`}
-                  title="Remove one"
-                >
-                  –
-                </button>
+              {hasSizePricing ? (
+                <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {p.size_pricing.map((option) => (
+                    <div
+                      key={`${p.sku}-${option.label}`}
+                      style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}
+                    >
+                      <div style={{ fontSize: 12, color: "#e8eefc" }}>
+                        {option.label} • £{option.price.toFixed(2)}
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <button
+                          disabled={busy}
+                          onClick={() => onMinus(`${p.name} ${option.label}`)}
+                          style={{
+                            width: 36,
+                            height: 32,
+                            borderRadius: 10,
+                            border: "1px solid #1d2b4a",
+                            background: "#0b1324",
+                            color: "#e8eefc",
+                            cursor: busy ? "not-allowed" : "pointer",
+                            fontWeight: 900,
+                            fontSize: 16,
+                            lineHeight: "32px",
+                          }}
+                          aria-label={`Remove one ${p.name} ${option.label}`}
+                          title="Remove one"
+                        >
+                          –
+                        </button>
 
-                <button
-                  disabled={busy || p.in_stock <= 0}
-                  onClick={() => onPlus(p.name)}
-                  style={{
-                    width: 36,
-                    height: 32,
-                    borderRadius: 10,
-                    border: "1px solid #1d2b4a",
-                    background: !busy && p.in_stock > 0 ? "#1b3a78" : "#0b1324",
-                    color: "#e8eefc",
-                    cursor: !busy && p.in_stock > 0 ? "pointer" : "not-allowed",
-                    fontWeight: 900,
-                    fontSize: 16,
-                    lineHeight: "32px",
-                  }}
-                  aria-label={`Add one ${p.name}`}
-                  title="Add one"
-                >
-                  +
-                </button>
-              </div>
+                        <button
+                          disabled={busy || p.in_stock <= 0}
+                          onClick={() => onPlus(`${p.name} ${option.label}`)}
+                          style={{
+                            width: 36,
+                            height: 32,
+                            borderRadius: 10,
+                            border: "1px solid #1d2b4a",
+                            background: !busy && p.in_stock > 0 ? "#1b3a78" : "#0b1324",
+                            color: "#e8eefc",
+                            cursor: !busy && p.in_stock > 0 ? "pointer" : "not-allowed",
+                            fontWeight: 900,
+                            fontSize: 16,
+                            lineHeight: "32px",
+                          }}
+                          aria-label={`Add one ${p.name} ${option.label}`}
+                          title="Add one"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                  <button
+                    disabled={busy}
+                    onClick={() => onMinus(p.name)}
+                    style={{
+                      width: 36,
+                      height: 32,
+                      borderRadius: 10,
+                      border: "1px solid #1d2b4a",
+                      background: "#0b1324",
+                      color: "#e8eefc",
+                      cursor: busy ? "not-allowed" : "pointer",
+                      fontWeight: 900,
+                      fontSize: 16,
+                      lineHeight: "32px",
+                    }}
+                    aria-label={`Remove one ${p.name}`}
+                    title="Remove one"
+                  >
+                    –
+                  </button>
+
+                  <button
+                    disabled={busy || p.in_stock <= 0}
+                    onClick={() => onPlus(p.name)}
+                    style={{
+                      width: 36,
+                      height: 32,
+                      borderRadius: 10,
+                      border: "1px solid #1d2b4a",
+                      background: !busy && p.in_stock > 0 ? "#1b3a78" : "#0b1324",
+                      color: "#e8eefc",
+                      cursor: !busy && p.in_stock > 0 ? "pointer" : "not-allowed",
+                      fontWeight: 900,
+                      fontSize: 16,
+                      lineHeight: "32px",
+                    }}
+                    aria-label={`Add one ${p.name}`}
+                    title="Add one"
+                  >
+                    +
+                  </button>
+                </div>
+              )}
             </div>
           );
         })}

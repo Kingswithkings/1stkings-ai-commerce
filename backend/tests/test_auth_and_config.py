@@ -1,8 +1,10 @@
+import io
+
 from fastapi.testclient import TestClient
 
 from app.db import SessionLocal, Base, engine
 from app.main import app
-from app.models import AdminUser, Store
+from app.models import AdminUser, Product, Store
 from app.security import hash_password
 
 
@@ -147,3 +149,86 @@ def test_store_settings_reject_duplicate_meta_phone_number_id():
     assert first_update.status_code == 200
     assert duplicate_update.status_code == 409
     assert "already assigned" in duplicate_update.json()["detail"]
+
+
+def test_admin_can_create_product_with_uploaded_image():
+    client = TestClient(app)
+    login = client.post(
+        "/admin/login",
+        json={"email": "owner@example.com", "password": "secret123"},
+    )
+    token = login.json()["access_token"]
+
+    response = client.post(
+        "/admin/products",
+        headers={"Authorization": f"Bearer {token}"},
+        data={
+            "sku": "plantain-1",
+            "name": "Plantain",
+            "aliases": "ripe plantain",
+            "price": "3.5",
+            "unit": "each",
+            "stock_qty": "8",
+            "category": "Fruit",
+            "image_url": "",
+            "description": "Fresh plantain",
+            "is_active": "true",
+            "min_stock_level": "2",
+            "remove_image": "false",
+        },
+        files={"image_file": ("plantain.jpg", io.BytesIO(b"fake-image-bytes"), "image/jpeg")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["product"]["image_url"].startswith("/uploads/products/store-")
+
+    uploaded_image = client.get(body["product"]["image_url"])
+    assert uploaded_image.status_code == 200
+    assert uploaded_image.content == b"fake-image-bytes"
+
+    db = SessionLocal()
+    try:
+        product = db.query(Product).filter(Product.sku == "plantain-1").first()
+        assert product is not None
+        assert product.image_url == body["product"]["image_url"]
+    finally:
+        db.close()
+
+
+def test_admin_can_create_product_with_size_pricing():
+    client = TestClient(app)
+    login = client.post(
+        "/admin/login",
+        json={"email": "owner@example.com", "password": "secret123"},
+    )
+    token = login.json()["access_token"]
+
+    response = client.post(
+        "/admin/products",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "sku": "drink-1",
+            "name": "Malt Drink",
+            "aliases": "malt",
+            "price": 1.5,
+            "unit": "bottle",
+            "stock_qty": 12,
+            "category": "Drinks",
+            "image_url": None,
+            "description": "Chilled drink",
+            "size_pricing": [
+                {"label": "330ml", "price": 1.5},
+                {"label": "1L", "price": 2.9},
+            ],
+            "is_active": True,
+            "min_stock_level": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["product"]["size_pricing"] == [
+        {"label": "330ml", "price": 1.5},
+        {"label": "1L", "price": 2.9},
+    ]

@@ -34,6 +34,44 @@ def test_extract_sendpulse_message_supports_nested_payload():
     assert text_body == "I need rice"
 
 
+def test_extract_sendpulse_message_supports_list_payload_with_contact_message():
+    bot_id, customer_phone, text_body = _extract_sendpulse_message(
+        [
+            {
+                "bot": {"id": "bot-99"},
+                "contact": {
+                    "phone": "+447700900001",
+                    "last_message_data": {
+                        "message": {
+                            "text": {"body": "Do you have yam flour?"}
+                        }
+                    },
+                },
+            }
+        ]
+    )
+
+    assert bot_id == "bot-99"
+    assert customer_phone == "+447700900001"
+    assert text_body == "Do you have yam flour?"
+
+
+def test_extract_sendpulse_message_falls_back_to_contact_last_message():
+    bot_id, customer_phone, text_body = _extract_sendpulse_message(
+        {
+            "bot_id": "bot-77",
+            "contact": {
+                "phone": "+447700900002",
+                "last_message": "I need 2 bags of rice",
+            },
+        }
+    )
+
+    assert bot_id == "bot-77"
+    assert customer_phone == "+447700900002"
+    assert text_body == "I need 2 bags of rice"
+
+
 def test_find_store_returns_store_from_provider_key():
     store = object()
     db = DummyDB(store)

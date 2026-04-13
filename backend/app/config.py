@@ -22,6 +22,7 @@ _load_env_file()
 
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "https://global-food-webbot-cdaf.vercel.app",
     "https://naija-house-webbot.vercel.app",
     "https://1stkings-ai-commerce.vercel.app",

@@ -248,7 +248,7 @@ def handle_chat(
     clarifications = []
 
     for p in parsed:
-        prod, score, top5 = catalog.match(p.raw_name)
+        prod, score, top5, variant = catalog.match(p.raw_name)
 
         if (prod is None) or (score < 0.35):
             needs_admin = True
@@ -267,11 +267,11 @@ def handle_chat(
             continue
 
         matched_new.append({
-            "sku": prod.sku,
-            "name": prod.name,
+            "sku": prod.sku if variant is None else f"{prod.sku}::{variant.label.lower()}",
+            "name": prod.name if variant is None else f"{prod.name} {variant.label}",
             "qty": int(p.qty),
             "unit": prod.unit,
-            "unit_price": float(prod.price),
+            "unit_price": float(prod.price if variant is None else variant.price),
         })
 
     if flagged:

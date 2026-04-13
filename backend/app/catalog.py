@@ -5,6 +5,13 @@ from pathlib import Path
 
 from app.db import SessionLocal
 from app.models import Product as DbProduct, Store
+from app.size_pricing import loads_size_pricing
+
+@dataclass
+class SizePrice:
+    label: str
+    price: float
+
 
 @dataclass
 class Product:
@@ -15,6 +22,7 @@ class Product:
     unit: str
     in_stock: int
     category: str  # ✅ NEW
+    size_pricing: list[SizePrice]
 
 def _norm(s: str) -> str:
     s = (s or "").lower().strip()
@@ -53,24 +61,38 @@ class Catalog:
                         unit=(r.get("unit") or "").strip() or "unit",
                         in_stock=int(r.get("in_stock") or 0),
                         category=category,  # ✅ NEW
+                        size_pricing=[],
                     )
                 )
 
-    def match(self, query: str) -> tuple[Product | None, float, list[tuple[Product, float]]]:
+    def match(self, query: str) -> tuple[Product | None, float, list[tuple[Product, float]], SizePrice | None]:
         q = _token_set(query)
-        scored: list[tuple[Product, float]] = []
+        scored: list[tuple[Product, float, SizePrice | None]] = []
 
         for p in self.products:
             candidates = [p.name] + p.aliases
+            best_variant: SizePrice | None = None
             best = 0.0
             for c in candidates:
-                best = max(best, jaccard(q, _token_set(c)))
+                score = jaccard(q, _token_set(c))
+                if score > best:
+                    best = score
+                    best_variant = None
+            for option in p.size_pricing:
+                variant_candidates = [f"{p.name} {option.label}"] + [
+                    f"{alias} {option.label}" for alias in p.aliases
+                ]
+                for candidate in variant_candidates:
+                    score = jaccard(q, _token_set(candidate))
+                    if score > best:
+                        best = score
+                        best_variant = option
             if best > 0:
-                scored.append((p, best))
+                scored.append((p, best, best_variant))
 
         scored.sort(key=lambda x: x[1], reverse=True)
-        top = scored[0] if scored else (None, 0.0)
-        return top[0], float(top[1]), scored[:5]
+        top = scored[0] if scored else (None, 0.0, None)
+        return top[0], float(top[1]), [(product, score) for product, score, _ in scored[:5]], top[2]
 
 
 def load_catalog_for_store(store_slug: str) -> Catalog:
@@ -103,6 +125,10 @@ def load_catalog_for_store(store_slug: str) -> Catalog:
             unit=product.unit or "unit",
             in_stock=int(product.stock_qty or 0),
             category=product.category or "Uncategorized",
+            size_pricing=[
+                SizePrice(label=item["label"], price=float(item["price"]))
+                for item in loads_size_pricing(product.size_pricing)
+            ],
         )
         for product in products
     ]

@@ -1,14 +1,16 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
 from app.models import AdminUser, Product, Store
-from app.security import SECRET_KEY, ALGORITHM
+from app.security import ALGORITHM, SECRET_KEY
+from app.size_pricing import dumps_size_pricing, loads_size_pricing, normalize_size_pricing
+from app.uploads import delete_uploaded_image, save_product_image
 
 router = APIRouter(prefix="/admin/products", tags=["admin-products"])
 security = HTTPBearer()
@@ -54,6 +56,7 @@ class ProductCreate(BaseModel):
     category: str = "Uncategorized"
     image_url: Optional[str] = None
     description: Optional[str] = None
+    size_pricing: list[dict] = []
     is_active: bool = True
     min_stock_level: int = 0
 
@@ -68,6 +71,7 @@ class ProductUpdate(BaseModel):
     category: Optional[str] = None
     image_url: Optional[str] = None
     description: Optional[str] = None
+    size_pricing: Optional[list[dict]] = None
     is_active: Optional[bool] = None
     min_stock_level: Optional[int] = None
 
@@ -87,6 +91,110 @@ class StoreChannelSettingsUpdate(BaseModel):
     whatsapp_phone_number_id: Optional[str] = None
     whatsapp_bot_id: Optional[str] = None
     whatsapp_verify_token: Optional[str] = None
+
+
+def _serialize_product(product: Product) -> dict:
+    return {
+        "id": product.id,
+        "sku": product.sku,
+        "name": product.name,
+        "aliases": product.aliases or "",
+        "price": product.price,
+        "unit": product.unit,
+        "stock_qty": product.stock_qty,
+        "in_stock": product.in_stock,
+        "category": product.category or "Uncategorized",
+        "image_url": product.image_url,
+        "description": product.description,
+        "size_pricing": loads_size_pricing(product.size_pricing),
+        "is_active": product.is_active,
+        "min_stock_level": product.min_stock_level,
+        "low_stock": product.stock_qty <= product.min_stock_level if product.min_stock_level > 0 else False,
+    }
+
+
+def _parse_bool(value: object, field_name: str) -> bool:
+    normalized = str(value).strip().lower()
+    if normalized in {"true", "1", "yes", "on"}:
+        return True
+    if normalized in {"false", "0", "no", "off"}:
+        return False
+    raise HTTPException(status_code=422, detail=f"Invalid boolean value for {field_name}")
+
+
+def _parse_int(value: object, field_name: str) -> int:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid integer value for {field_name}") from exc
+
+
+def _parse_float(value: object, field_name: str) -> float:
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid number value for {field_name}") from exc
+
+
+async def _parse_product_payload(
+    request: Request,
+    *,
+    partial: bool,
+) -> tuple[ProductCreate | ProductUpdate, UploadFile | None, bool]:
+    content_type = request.headers.get("content-type", "")
+
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        image_file = form.get("image_file")
+        uploaded_image = image_file if getattr(image_file, "filename", "") else None
+        remove_image = _parse_bool(form.get("remove_image", "false"), "remove_image")
+        form_data: dict[str, object] = {}
+
+        def assign_text(field: str) -> None:
+            if field in form:
+                form_data[field] = str(form.get(field) or "")
+
+        def assign_int(field: str) -> None:
+            if field in form:
+                form_data[field] = _parse_int(form.get(field), field)
+
+        def assign_float(field: str) -> None:
+            if field in form:
+                form_data[field] = _parse_float(form.get(field), field)
+
+        def assign_bool(field: str) -> None:
+            if field in form:
+                form_data[field] = _parse_bool(form.get(field), field)
+
+        for text_field in ["sku", "name", "aliases", "unit", "category", "image_url", "description"]:
+            assign_text(text_field)
+        if "size_pricing" in form:
+            form_data["size_pricing"] = normalize_size_pricing(form.get("size_pricing"))
+        assign_float("price")
+        assign_int("stock_qty")
+        assign_int("min_stock_level")
+        assign_bool("is_active")
+
+        try:
+            payload = ProductUpdate.model_validate(form_data) if partial else ProductCreate.model_validate(form_data)
+        except ValidationError as exc:
+            raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
+        return payload, uploaded_image, remove_image
+
+    try:
+        body = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid request body") from exc
+
+    remove_image = bool(body.get("remove_image", False))
+
+    try:
+        payload = ProductUpdate.model_validate(body) if partial else ProductCreate.model_validate(body)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors()) from exc
+
+    return payload, None, remove_image
 
 
 def _ensure_unique_store_channel_identifiers(
@@ -141,25 +249,7 @@ def list_admin_products(
         .all()
     )
 
-    return [
-        {
-            "id": p.id,
-            "sku": p.sku,
-            "name": p.name,
-            "aliases": p.aliases or "",
-            "price": p.price,
-            "unit": p.unit,
-            "stock_qty": p.stock_qty,
-            "in_stock": p.in_stock,
-            "category": p.category or "Uncategorized",
-            "image_url": p.image_url,
-            "description": p.description,
-            "is_active": p.is_active,
-            "min_stock_level": p.min_stock_level,
-            "low_stock": p.stock_qty <= p.min_stock_level if p.min_stock_level > 0 else False,
-        }
-        for p in products
-    ]
+    return [_serialize_product(product) for product in products]
 
 
 @router.get("/settings")
@@ -228,11 +318,13 @@ def update_store_settings(
 
 
 @router.post("")
-def create_product(
-    payload: ProductCreate,
+async def create_product(
+    request: Request,
     admin=Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    payload, uploaded_image, _ = await _parse_product_payload(request, partial=False)
+
     existing = (
         db.query(Product)
         .filter(Product.store_id == admin.store_id, Product.sku == payload.sku)
@@ -253,9 +345,17 @@ def create_product(
         category=payload.category.strip() or "Uncategorized",
         image_url=(payload.image_url or "").strip() or None,
         description=(payload.description or "").strip() or None,
+        size_pricing=dumps_size_pricing(payload.size_pricing),
         is_active=payload.is_active,
         min_stock_level=payload.min_stock_level,
     )
+
+    if uploaded_image is not None:
+        product.image_url = save_product_image(
+            uploaded_image,
+            store_id=admin.store_id,
+            sku=product.sku,
+        )
 
     db.add(product)
     db.commit()
@@ -263,30 +363,19 @@ def create_product(
 
     return {
         "message": "Product created",
-        "product": {
-            "id": product.id,
-            "sku": product.sku,
-            "name": product.name,
-            "price": product.price,
-            "unit": product.unit,
-            "stock_qty": product.stock_qty,
-            "in_stock": product.in_stock,
-            "category": product.category,
-            "image_url": product.image_url,
-            "description": product.description,
-            "is_active": product.is_active,
-            "min_stock_level": product.min_stock_level,
-        },
+        "product": _serialize_product(product),
     }
 
 
 @router.put("/{product_id}")
-def update_product(
+async def update_product(
     product_id: int,
-    payload: ProductUpdate,
+    request: Request,
     admin=Depends(get_current_admin),
     db: Session = Depends(get_db),
 ):
+    payload, uploaded_image, remove_image = await _parse_product_payload(request, partial=True)
+
     product = (
         db.query(Product)
         .filter(Product.id == product_id, Product.store_id == admin.store_id)
@@ -294,6 +383,8 @@ def update_product(
     )
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
+
+    original_image_url = product.image_url
 
     if payload.sku is not None:
         product.sku = payload.sku.strip()
@@ -312,32 +403,32 @@ def update_product(
         product.category = payload.category.strip() or "Uncategorized"
     if payload.image_url is not None:
         product.image_url = payload.image_url.strip() or None
+    elif remove_image:
+        product.image_url = None
     if payload.description is not None:
         product.description = payload.description.strip() or None
+    if payload.size_pricing is not None:
+        product.size_pricing = dumps_size_pricing(payload.size_pricing)
     if payload.is_active is not None:
         product.is_active = payload.is_active
     if payload.min_stock_level is not None:
         product.min_stock_level = payload.min_stock_level
+    if uploaded_image is not None:
+        product.image_url = save_product_image(
+            uploaded_image,
+            store_id=admin.store_id,
+            sku=product.sku,
+        )
+
+    if original_image_url != product.image_url:
+        delete_uploaded_image(original_image_url)
 
     db.commit()
     db.refresh(product)
 
     return {
         "message": "Product updated",
-        "product": {
-            "id": product.id,
-            "sku": product.sku,
-            "name": product.name,
-            "price": product.price,
-            "unit": product.unit,
-            "stock_qty": product.stock_qty,
-            "in_stock": product.in_stock,
-            "category": product.category,
-            "image_url": product.image_url,
-            "description": product.description,
-            "is_active": product.is_active,
-            "min_stock_level": product.min_stock_level,
-        },
+        "product": _serialize_product(product),
     }
 
 
@@ -355,6 +446,7 @@ def delete_product(
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
 
+    delete_uploaded_image(product.image_url)
     db.delete(product)
     db.commit()
 

@@ -205,21 +205,30 @@ def _handle_meta_payload(db: Session, payload: dict[str, Any], store_slug: str |
     return replies
 
 
-def _extract_sendpulse_message(payload: dict[str, Any]) -> tuple[str, str, str]:
+def _extract_sendpulse_message(payload: dict[str, Any] | list[Any]) -> tuple[str, str, str]:
+    event = payload[0] if isinstance(payload, list) and payload else payload
+    if not isinstance(event, dict):
+        return "", "", ""
+
+    contact = event.get("contact", {}) or {}
+    last_message_data = contact.get("last_message_data", {}) or {}
+    nested_message = last_message_data.get("message", {}) or {}
+
     bot_id = (
-        payload.get("bot_id")
-        or payload.get("bot", {}).get("id")
-        or payload.get("chatbot", {}).get("id")
+        event.get("bot_id")
+        or event.get("bot", {}).get("id")
+        or event.get("chatbot", {}).get("id")
+        or event.get("channel", {}).get("id")
         or ""
     )
     phone = (
-        payload.get("phone")
-        or payload.get("contact", {}).get("phone")
-        or payload.get("subscriber", {}).get("phone")
-        or payload.get("chat", {}).get("contact", {}).get("phone")
+        event.get("phone")
+        or contact.get("phone")
+        or event.get("subscriber", {}).get("phone")
+        or event.get("chat", {}).get("contact", {}).get("phone")
         or ""
     )
-    message = payload.get("message")
+    message = event.get("message") or nested_message
     if isinstance(message, dict):
         text_body = (
             message.get("text")
@@ -230,7 +239,13 @@ def _extract_sendpulse_message(payload: dict[str, Any]) -> tuple[str, str, str]:
         if isinstance(text_body, dict):
             text_body = text_body.get("body") or text_body.get("text") or ""
     else:
-        text_body = message or payload.get("text") or payload.get("body") or ""
+        text_body = (
+            message
+            or event.get("text")
+            or event.get("body")
+            or contact.get("last_message")
+            or ""
+        )
 
     return str(bot_id).strip(), str(phone).strip(), str(text_body).strip()
 
@@ -285,7 +300,7 @@ async def whatsapp_webhook(request: Request, store_slug: str | None = Query(None
     db: Session = SessionLocal()
 
     try:
-        if isinstance(payload.get("entry"), list):
+        if isinstance(payload, dict) and isinstance(payload.get("entry"), list):
             replies = _handle_meta_payload(db, payload, store_slug)
             return {"ok": True, "provider": "meta", "processed": len(replies), "replies": replies}
 

@@ -71,6 +71,7 @@ class Product(Base):
     category = Column(String, nullable=True, default="Uncategorized")
     image_url = Column(String, nullable=True)
     description = Column(Text, nullable=True)
+    size_pricing = Column(Text, nullable=True)
 
     is_active = Column(Boolean, nullable=False, default=True)
     min_stock_level = Column(Integer, nullable=False, default=0)

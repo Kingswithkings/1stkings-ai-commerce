@@ -10,6 +10,7 @@ export type Product = {
   in_stock: number;
   aliases: string[];
   category: string;
+  size_pricing: { label: string; price: number }[];
 };
 
 const API_BASE = API_BASE_URL;
@@ -36,5 +37,6 @@ export async function fetchProducts(storeSlug: string): Promise<Product[]> {
     in_stock: Number(p.in_stock),
     aliases: Array.isArray(p.aliases) ? p.aliases : [],
     category: p.category || "Uncategorized",
+    size_pricing: Array.isArray(p.size_pricing) ? p.size_pricing : [],
   }));
 }

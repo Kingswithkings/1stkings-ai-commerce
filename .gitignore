@@ -6,5 +6,6 @@ frontend/.next/
 backend/.venv/
 __pycache__/
 *.pyc
+backend/uploads/
 .env
 .env.local

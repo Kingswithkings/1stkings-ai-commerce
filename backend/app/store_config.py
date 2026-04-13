@@ -15,7 +15,7 @@ STORES = {
     },
     "najeebullah": {
         "slug": "najeebullah",
-        "name": "Najeebullah",
+        "name": "Doncaster Budget Shop",
         "phone": "+44 7462638297",
         "opening": "Monday – Sunday",
         "products_file": "data/products_najeebullah.csv",

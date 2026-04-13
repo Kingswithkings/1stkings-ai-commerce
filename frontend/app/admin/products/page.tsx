@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { API_BASE } from "../../../lib/api";
+import { resolveImageUrl } from "../../../lib/images";
 
 type Product = {
   id: number;
@@ -15,6 +16,7 @@ type Product = {
   category: string;
   image_url?: string | null;
   description?: string | null;
+  size_pricing?: { label: string; price: number }[];
   is_active: boolean;
   min_stock_level: number;
   low_stock?: boolean;
@@ -41,6 +43,7 @@ const emptyForm = {
   category: "Uncategorized",
   image_url: "",
   description: "",
+  size_pricing: "",
   is_active: true,
   min_stock_level: "0",
 };
@@ -56,6 +59,10 @@ export default function AdminProductsPage() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const [form, setForm] = useState({ ...emptyForm });
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [selectedImagePreview, setSelectedImagePreview] = useState("");
+  const [removeImage, setRemoveImage] = useState(false);
+  const [imageInputKey, setImageInputKey] = useState(0);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -120,8 +127,26 @@ export default function AdminProductsPage() {
     fetchChannelSettings();
   }, []);
 
+  useEffect(() => {
+    if (!selectedImageFile) {
+      setSelectedImagePreview("");
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(selectedImageFile);
+    setSelectedImagePreview(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [selectedImageFile]);
+
   const resetForm = () => {
     setForm({ ...emptyForm });
+    setSelectedImageFile(null);
+    setSelectedImagePreview("");
+    setRemoveImage(false);
+    setImageInputKey((value) => value + 1);
     setEditingProduct(null);
     setShowCreateForm(false);
   };
@@ -131,6 +156,10 @@ export default function AdminProductsPage() {
     setError("");
     setEditingProduct(null);
     setForm({ ...emptyForm });
+    setSelectedImageFile(null);
+    setSelectedImagePreview("");
+    setRemoveImage(false);
+    setImageInputKey((value) => value + 1);
     setShowCreateForm(true);
   };
 
@@ -139,6 +168,10 @@ export default function AdminProductsPage() {
     setError("");
     setShowCreateForm(false);
     setEditingProduct(product);
+    setSelectedImageFile(null);
+    setSelectedImagePreview("");
+    setRemoveImage(false);
+    setImageInputKey((value) => value + 1);
 
     setForm({
       sku: product.sku || "",
@@ -150,6 +183,9 @@ export default function AdminProductsPage() {
       category: product.category || "Uncategorized",
       image_url: product.image_url || "",
       description: product.description || "",
+      size_pricing: (product.size_pricing || [])
+        .map((option) => `${option.label}:${option.price}`)
+        .join("\n"),
       is_active: product.is_active,
       min_stock_level: String(product.min_stock_level ?? 0),
     });
@@ -159,25 +195,90 @@ export default function AdminProductsPage() {
     field: string,
     value: string | boolean
   ) => {
+    if (field === "image_url") {
+      setSelectedImageFile(null);
+      setSelectedImagePreview("");
+      setRemoveImage(false);
+    }
+
     setForm((prev) => ({
       ...prev,
       [field]: value,
     }));
   };
 
-  const buildPayload = () => ({
-    sku: form.sku.trim(),
-    name: form.name.trim(),
-    aliases: form.aliases.trim(),
-    price: Number(form.price),
-    unit: form.unit.trim() || "each",
-    stock_qty: Number(form.stock_qty),
-    category: form.category.trim() || "Uncategorized",
-    image_url: form.image_url.trim() || null,
-    description: form.description.trim() || null,
-    is_active: Boolean(form.is_active),
-    min_stock_level: Number(form.min_stock_level),
-  });
+  const handleImageFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    setSelectedImageFile(file);
+    setRemoveImage(false);
+
+    if (file) {
+      setForm((prev) => ({
+        ...prev,
+        image_url: "",
+      }));
+    }
+  };
+
+  const clearSelectedImage = () => {
+    setSelectedImageFile(null);
+    setSelectedImagePreview("");
+    setRemoveImage(true);
+    setImageInputKey((value) => value + 1);
+    setForm((prev) => ({
+      ...prev,
+      image_url: "",
+    }));
+  };
+
+  const parseSizePricingText = (value: string) => {
+    const lines = value
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    return lines.map((line) => {
+      const separatorIndex = line.lastIndexOf(":");
+      if (separatorIndex <= 0) {
+        throw new Error("Use one size per line in the format Size:Price");
+      }
+
+      const label = line.slice(0, separatorIndex).trim();
+      const rawPrice = line.slice(separatorIndex + 1).trim();
+      const price = Number(rawPrice);
+
+      if (!label || Number.isNaN(price)) {
+        throw new Error("Use one size per line in the format Size:Price");
+      }
+
+      return { label, price };
+    });
+  };
+
+  const buildPayload = () => {
+    const payload = new FormData();
+    payload.set("sku", form.sku.trim());
+    payload.set("name", form.name.trim());
+    payload.set("aliases", form.aliases.trim());
+    payload.set("price", String(Number(form.price)));
+    payload.set("unit", form.unit.trim() || "each");
+    payload.set("stock_qty", String(Number(form.stock_qty)));
+    payload.set("category", form.category.trim() || "Uncategorized");
+    payload.set("image_url", form.image_url.trim());
+    payload.set("description", form.description.trim());
+    payload.set("size_pricing", JSON.stringify(parseSizePricingText(form.size_pricing)));
+    payload.set("is_active", String(Boolean(form.is_active)));
+    payload.set("min_stock_level", String(Number(form.min_stock_level)));
+    payload.set("remove_image", String(removeImage && !selectedImageFile && !form.image_url.trim()));
+
+    if (selectedImageFile) {
+      payload.set("image_file", selectedImageFile);
+    }
+
+    return payload;
+  };
+
+  const imagePreviewUrl = selectedImagePreview || resolveImageUrl(form.image_url);
 
   const handleCreate = async () => {
     setSaving(true);
@@ -187,8 +288,10 @@ export default function AdminProductsPage() {
     try {
       const res = await fetch(`${API_BASE}/admin/products`, {
         method: "POST",
-        headers: authHeaders,
-        body: JSON.stringify(buildPayload()),
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: buildPayload(),
       });
 
       const data = await res.json();
@@ -219,8 +322,10 @@ export default function AdminProductsPage() {
         `${API_BASE}/admin/products/${editingProduct.id}`,
         {
           method: "PUT",
-          headers: authHeaders,
-          body: JSON.stringify(buildPayload()),
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: buildPayload(),
         }
       );
 
@@ -567,11 +672,66 @@ export default function AdminProductsPage() {
               onChange={(e) => handleChange("image_url", e.target.value)}
             />
 
+            <div className="md:col-span-2 rounded border border-dashed p-4">
+              <div className="text-sm font-medium">Upload or snap a product image</div>
+              <div className="mt-1 text-xs text-gray-600">
+                Paste an external URL above, or upload directly from your device camera or gallery here.
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-3">
+                <label className="rounded border px-3 py-2 text-sm cursor-pointer">
+                  Upload from device
+                  <input
+                    key={`library-${imageInputKey}`}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageFileChange}
+                  />
+                </label>
+
+                <label className="rounded border px-3 py-2 text-sm cursor-pointer">
+                  Snap photo
+                  <input
+                    key={`camera-${imageInputKey}`}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleImageFileChange}
+                  />
+                </label>
+
+                {(selectedImageFile || form.image_url) && (
+                  <button
+                    type="button"
+                    onClick={clearSelectedImage}
+                    className="rounded border px-3 py-2 text-sm text-red-600"
+                  >
+                    Remove image
+                  </button>
+                )}
+              </div>
+
+              {selectedImageFile && (
+                <div className="mt-3 text-sm text-gray-700">
+                  Selected file: {selectedImageFile.name}
+                </div>
+              )}
+            </div>
+
             <textarea
               className="border p-2 rounded md:col-span-2 min-h-[100px]"
               placeholder="Description"
               value={form.description}
               onChange={(e) => handleChange("description", e.target.value)}
+            />
+
+            <textarea
+              className="border p-2 rounded md:col-span-2 min-h-[100px]"
+              placeholder={`Size pricing (optional)\n500ml:1.50\n1L:2.50`}
+              value={form.size_pricing}
+              onChange={(e) => handleChange("size_pricing", e.target.value)}
             />
 
             <label className="flex items-center gap-2">
@@ -584,12 +744,12 @@ export default function AdminProductsPage() {
             </label>
           </div>
 
-          {form.image_url && (
+          {imagePreviewUrl && (
             <div className="mt-4">
               <p className="mb-2 text-sm font-medium">Image Preview</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={form.image_url}
+                src={imagePreviewUrl}
                 alt="Preview"
                 className="h-32 w-32 object-cover rounded border"
               />
@@ -647,7 +807,7 @@ export default function AdminProductsPage() {
                   {p.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={p.image_url}
+                      src={resolveImageUrl(p.image_url)}
                       alt={p.name}
                       className="h-14 w-14 object-cover rounded border"
                     />
@@ -660,6 +820,13 @@ export default function AdminProductsPage() {
 
                 <td className="p-3">
                   <div className="font-medium">{p.name}</div>
+                  {p.size_pricing && p.size_pricing.length > 0 && (
+                    <div className="text-xs text-gray-500 mt-1 max-w-xs">
+                      {p.size_pricing
+                        .map((option) => `${option.label}: £${Number(option.price).toFixed(2)}`)
+                        .join(" • ")}
+                    </div>
+                  )}
                   {p.description && (
                     <div className="text-xs text-gray-500 mt-1 max-w-xs">
                       {p.description}

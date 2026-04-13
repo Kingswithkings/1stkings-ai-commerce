@@ -24,7 +24,7 @@ const STORE_CONFIG: Record<
     example: "2 indomie onion and rice 5kg",
   },
   "najeebullah": {
-    name: "Najeebullah",
+    name: "Doncaster Budget Shop",
     phone: "+44 7462638297",
     opening: "Monday – Sunday",
     example: "2 phone chargers, 1 toilet brush and 1 frying pan",

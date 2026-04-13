@@ -131,6 +131,10 @@ def ensure_schema():
         if "whatsapp_verify_token" not in store_columns:
             conn.execute(text("ALTER TABLE stores ADD COLUMN whatsapp_verify_token VARCHAR"))
 
+        product_columns = _column_names("products") if "products" in existing_tables else set()
+        if "size_pricing" not in product_columns:
+            conn.execute(text("ALTER TABLE products ADD COLUMN size_pricing TEXT"))
+
         order_columns = _column_names("orders")
         if "channel" not in order_columns:
             conn.execute(
