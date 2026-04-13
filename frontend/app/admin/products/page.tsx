@@ -752,13 +752,13 @@ export default function AdminProductsPage() {
           </div>
 
           {imagePreviewUrl && (
-            <div className="mt-4">
+            <div className="mt-4 flex items-center gap-3">
               <p className="mb-2 text-sm font-medium">Image Preview</p>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imagePreviewUrl}
                 alt="Preview"
-                className="h-20 w-20 object-cover rounded border"
+                className="h-12 w-12 object-cover rounded border"
               />
             </div>
           )}
