@@ -137,9 +137,43 @@ export default function ProductList({
                   color: "#e8eefc",
                 }}
               >
-                <div style={{ fontWeight: 650 }}>
-                  {p.name}
-                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>{cat}</div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  {p.image_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={p.image_url}
+                      alt={p.name}
+                      style={{
+                        width: 52,
+                        height: 52,
+                        objectFit: "cover",
+                        borderRadius: 10,
+                        border: "1px solid #1d2b4a",
+                        flexShrink: 0,
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 52,
+                        height: 52,
+                        borderRadius: 10,
+                        border: "1px solid #1d2b4a",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 10,
+                        color: "#9ca3af",
+                        flexShrink: 0,
+                      }}
+                    >
+                      No image
+                    </div>
+                  )}
+                  <div style={{ fontWeight: 650 }}>
+                    {p.name}
+                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>{cat}</div>
+                  </div>
                 </div>
                 <div style={{ fontWeight: 900 }}>
                   {hasSizePricing

@@ -279,6 +279,7 @@ export default function AdminProductsPage() {
   };
 
   const imagePreviewUrl = selectedImagePreview || resolveImageUrl(form.image_url);
+  const showingExistingImage = Boolean(!selectedImageFile && form.image_url);
 
   const handleCreate = async () => {
     setSaving(true);
@@ -708,7 +709,7 @@ export default function AdminProductsPage() {
                     onClick={clearSelectedImage}
                     className="rounded border px-3 py-2 text-sm text-red-600"
                   >
-                    Remove image
+                    {showingExistingImage ? "Remove current image" : "Clear selected image"}
                   </button>
                 )}
               </div>
@@ -716,6 +717,12 @@ export default function AdminProductsPage() {
               {selectedImageFile && (
                 <div className="mt-3 text-sm text-gray-700">
                   Selected file: {selectedImageFile.name}
+                </div>
+              )}
+
+              {removeImage && !selectedImageFile && !form.image_url && (
+                <div className="mt-3 text-sm text-red-600">
+                  This product image will be removed when you save.
                 </div>
               )}
             </div>
@@ -751,7 +758,7 @@ export default function AdminProductsPage() {
               <img
                 src={imagePreviewUrl}
                 alt="Preview"
-                className="h-32 w-32 object-cover rounded border"
+                className="h-20 w-20 object-cover rounded border"
               />
             </div>
           )}

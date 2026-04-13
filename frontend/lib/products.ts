@@ -1,6 +1,7 @@
 // frontend/lib/products.ts
 
 import { API_BASE_URL } from "./config";
+import { resolveImageUrl } from "./images";
 
 export type Product = {
   sku: string;
@@ -10,6 +11,7 @@ export type Product = {
   in_stock: number;
   aliases: string[];
   category: string;
+  image_url?: string | null;
   size_pricing: { label: string; price: number }[];
 };
 
@@ -37,6 +39,7 @@ export async function fetchProducts(storeSlug: string): Promise<Product[]> {
     in_stock: Number(p.in_stock),
     aliases: Array.isArray(p.aliases) ? p.aliases : [],
     category: p.category || "Uncategorized",
+    image_url: resolveImageUrl(p.image_url),
     size_pricing: Array.isArray(p.size_pricing) ? p.size_pricing : [],
   }));
 }
