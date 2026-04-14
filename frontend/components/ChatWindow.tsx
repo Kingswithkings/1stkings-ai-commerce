@@ -19,13 +19,13 @@ const STORE_CONFIG: Record<
   },
   "global-food-market": {
     name: "Global Food Market",
-    phone: "07466600834",
+    phone: "+4475877167843",
     opening: "Monday – Sunday",
     example: "2 indomie onion and rice 5kg",
   },
-  "najeebullah": {
+  "doncaster-budget-shop": {
     name: "Doncaster Budget Shop",
-    phone: "+44 7462638297",
+    phone: "+447345036753",
     opening: "Monday – Sunday",
     example: "2 phone chargers, 1 toilet brush and 1 frying pan",
   },

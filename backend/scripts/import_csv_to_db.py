@@ -16,13 +16,13 @@ STORE_FILES = {
     },
     "global-food-market": {
         "name": "Global Food Market",
-        "phone": "07466600834",
+        "phone": "+4475877167843",
         "opening": "Monday – Sunday",
         "file": DATA_DIR / "products_global_food_market.csv",
     },
-    "najeebullah": {
+    "doncaster-budget-shop": {
         "name": "Doncaster Budget Shop",
-        "phone": "+44 7462638297",
+        "phone": "+447345036753",
         "opening": "Monday – Sunday",
         "file": DATA_DIR / "products_najeebullah.csv",
     },
