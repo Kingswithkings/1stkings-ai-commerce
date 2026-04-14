@@ -19,7 +19,7 @@ const STORE_CONFIG: Record<
   },
   "global-food-market": {
     name: "Global Food Market",
-    phone: "+4475877167843",
+    phone: "+447587167843",
     opening: "Monday – Sunday",
     example: "2 indomie onion and rice 5kg",
   },

@@ -16,7 +16,7 @@ STORE_FILES = {
     },
     "global-food-market": {
         "name": "Global Food Market",
-        "phone": "+4475877167843",
+        "phone": "+447587167843",
         "opening": "Monday – Sunday",
         "file": DATA_DIR / "products_global_food_market.csv",
     },
