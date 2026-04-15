@@ -284,7 +284,8 @@ def test_confirmed_order_sends_notification_to_store_recipient(monkeypatch):
 
 
 def test_checkout_asks_delivery_or_pickup_after_customer_info():
-    order = get_or_create_draft_order("web-checkout-session", "test-store", "web")
+    session_id = "web-checkout-session-fulfillment"
+    order = get_or_create_draft_order(session_id, "test-store", "web")
     update_order(
         int(order["id"]),
         items=json.dumps(
@@ -300,7 +301,7 @@ def test_checkout_asks_delivery_or_pickup_after_customer_info():
     )
 
     result = handle_chat(
-        session_id="web-checkout-session",
+        session_id=session_id,
         user_text="checkout",
         catalog=None,
         store_slug="test-store",
@@ -309,7 +310,7 @@ def test_checkout_asks_delivery_or_pickup_after_customer_info():
     assert "What’s your name?" in result["reply"]
 
     result = handle_chat(
-        session_id="web-checkout-session",
+        session_id=session_id,
         user_text="Jane Customer",
         catalog=None,
         store_slug="test-store",
@@ -318,7 +319,7 @@ def test_checkout_asks_delivery_or_pickup_after_customer_info():
     assert "What phone number" in result["reply"]
 
     result = handle_chat(
-        session_id="web-checkout-session",
+        session_id=session_id,
         user_text="+447700900123",
         catalog=None,
         store_slug="test-store",
@@ -327,7 +328,7 @@ def test_checkout_asks_delivery_or_pickup_after_customer_info():
     assert "delivery or pickup" in result["reply"].lower()
 
     result = handle_chat(
-        session_id="web-checkout-session",
+        session_id=session_id,
         user_text="delivery",
         catalog=None,
         store_slug="test-store",
@@ -336,7 +337,7 @@ def test_checkout_asks_delivery_or_pickup_after_customer_info():
     assert "delivery address" in result["reply"].lower()
 
     result = handle_chat(
-        session_id="web-checkout-session",
+        session_id=session_id,
         user_text="10 Downing Street",
         catalog=None,
         store_slug="test-store",

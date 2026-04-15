@@ -130,6 +130,7 @@ def _extract_sendpulse_message(payload: dict[str, Any] | list[Any]) -> tuple[str
         )
         if isinstance(text_body, dict):
             text_body = text_body.get("body") or text_body.get("text") or ""
+        text_body = text_body or event.get("text") or event.get("body") or contact.get("last_message") or ""
     else:
         text_body = (
             message
