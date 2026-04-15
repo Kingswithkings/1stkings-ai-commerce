@@ -60,7 +60,9 @@ def ensure_schema():
                         session_id TEXT NOT NULL,
                         items TEXT NOT NULL DEFAULT '[]',
                         status TEXT NOT NULL DEFAULT 'draft',
+                        fulfillment_type TEXT,
                         pickup_time TEXT,
+                        delivery_address TEXT,
                         customer_name TEXT,
                         customer_phone TEXT,
                         flagged INTEGER NOT NULL DEFAULT 0,
@@ -110,6 +112,8 @@ def ensure_schema():
         store_columns = _column_names("stores") if "stores" in existing_tables else set()
         if "whatsapp_number" not in store_columns:
             conn.execute(text("ALTER TABLE stores ADD COLUMN whatsapp_number VARCHAR"))
+        if "order_notification_number" not in store_columns:
+            conn.execute(text("ALTER TABLE stores ADD COLUMN order_notification_number VARCHAR"))
         if "whatsapp_enabled" not in store_columns:
             conn.execute(
                 text(
@@ -136,6 +140,10 @@ def ensure_schema():
             conn.execute(text("ALTER TABLE products ADD COLUMN size_pricing TEXT"))
 
         order_columns = _column_names("orders")
+        if "fulfillment_type" not in order_columns:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN fulfillment_type TEXT"))
+        if "delivery_address" not in order_columns:
+            conn.execute(text("ALTER TABLE orders ADD COLUMN delivery_address TEXT"))
         if "channel" not in order_columns:
             conn.execute(
                 text("ALTER TABLE orders ADD COLUMN channel TEXT NOT NULL DEFAULT 'web'")
@@ -211,11 +219,11 @@ def get_or_create_draft_order(
             text(
                 """
                 INSERT INTO orders (
-                    session_id, items, status, pickup_time, customer_name,
-                    customer_phone, flagged, created_at, updated_at, store_slug, channel
+                    session_id, items, status, fulfillment_type, pickup_time, delivery_address,
+                    customer_name, customer_phone, flagged, created_at, updated_at, store_slug, channel
                 ) VALUES (
-                    :session_id, '[]', 'draft', NULL, NULL,
-                    NULL, 0, :created_at, :updated_at, :store_slug, :channel
+                    :session_id, '[]', 'draft', NULL, NULL, NULL,
+                    NULL, NULL, 0, :created_at, :updated_at, :store_slug, :channel
                 )
                 """
             ),
@@ -256,7 +264,9 @@ def update_order(order_id: int, **fields) -> dict | None:
     allowed = {
         "items",
         "status",
+        "fulfillment_type",
         "pickup_time",
+        "delivery_address",
         "customer_name",
         "customer_phone",
         "flagged",

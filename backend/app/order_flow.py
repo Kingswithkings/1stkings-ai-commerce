@@ -8,6 +8,7 @@ from app.db import (
     set_state,
 )
 from app.catalog import Catalog
+from app.order_notifications import send_new_order_notification
 
 
 def _load_items(order: dict) -> list[dict]:
@@ -19,6 +20,16 @@ def _load_items(order: dict) -> list[dict]:
 
 def _save_items(order_id: int, items: list[dict]):
     update_order(order_id, items=json.dumps(items))
+
+
+def _order_destination_lines(order: dict) -> list[str]:
+    fulfillment_type = str(order.get("fulfillment_type") or "").strip().lower()
+    if fulfillment_type == "delivery":
+        address = str(order.get("delivery_address") or "").strip()
+        return [f"Delivery: {address or '—'}"]
+
+    pickup_time = str(order.get("pickup_time") or "").strip()
+    return [f"Pickup: {pickup_time or '—'}"]
 
 
 def cart_totals(items: list[dict]) -> tuple[float, list[dict]]:
@@ -94,45 +105,65 @@ def handle_chat(
     t_low = text.lower()
 
     # State machine for checkout fields
-    if state == "checkout_wait_pickup_time":
-        update_order(order_id, pickup_time=text, status="checkout")
-        set_state(session_id, "checkout_wait_name", {"order_id": order_id}, store_slug, channel)
-        return _reply_with_cart(order_id, items, "Nice. What’s your name?")
-
     if state == "checkout_wait_name":
         update_order(order_id, customer_name=text)
         if channel == "whatsapp":
             update_order(order_id, customer_phone=session_id)
-            set_state(session_id, "checkout_confirm", {"order_id": order_id}, store_slug, channel)
-            total, enriched = cart_totals(items)
-            current_order = get_order(order_id)
-            return {
-                "reply": (
-                    f"Confirm your pickup order ✅\n"
-                    f"Name: {current_order.get('customer_name')}\n"
-                    f"Phone: {session_id}\n"
-                    f"Pickup: {current_order.get('pickup_time')}\n"
-                    f"Total: £{total}\n"
-                    f"Reply YES to confirm or CANCEL to stop."
-                ),
-                "cart": {"items": enriched, "total": total, "status": "checkout"},
-                "needs_admin": False,
-                "order_id": order_id,
-            }
+            set_state(session_id, "checkout_wait_fulfillment", {"order_id": order_id}, store_slug, channel)
+            return _reply_with_cart(order_id, items, "Thanks. Do you want delivery or pickup?")
         set_state(session_id, "checkout_wait_phone", {"order_id": order_id}, store_slug, channel)
         return _reply_with_cart(order_id, items, "Thanks. What phone number should we contact you on?")
 
     if state == "checkout_wait_phone":
         update_order(order_id, customer_phone=text)
+        set_state(session_id, "checkout_wait_fulfillment", {"order_id": order_id}, store_slug, channel)
+        return _reply_with_cart(order_id, items, "Do you want delivery or pickup?")
+
+    if state == "checkout_wait_fulfillment":
+        if t_low in {"pickup", "pick up", "collection", "collect"}:
+            update_order(order_id, fulfillment_type="pickup", delivery_address=None)
+            set_state(session_id, "checkout_wait_pickup_time", {"order_id": order_id}, store_slug, channel)
+            return _reply_with_cart(order_id, items, "Great. What pickup time do you want? (e.g., Today 6pm)")
+
+        if t_low in {"delivery", "deliver"}:
+            update_order(order_id, fulfillment_type="delivery", pickup_time=None)
+            set_state(session_id, "checkout_wait_delivery_address", {"order_id": order_id}, store_slug, channel)
+            return _reply_with_cart(order_id, items, "What delivery address should we use?")
+
+        return _reply_with_cart(order_id, items, "Please reply with DELIVERY or PICKUP.")
+
+    if state == "checkout_wait_pickup_time":
+        update_order(order_id, pickup_time=text, status="checkout")
         set_state(session_id, "checkout_confirm", {"order_id": order_id}, store_slug, channel)
         total, enriched = cart_totals(items)
         current_order = get_order(order_id)
+        destination_lines = _order_destination_lines(current_order)
         return {
             "reply": (
-                f"Confirm your pickup order ✅\n"
+                "Confirm your order ✅\n"
                 f"Name: {current_order.get('customer_name')}\n"
-                f"Phone: {text}\n"
-                f"Pickup: {current_order.get('pickup_time')}\n"
+                f"Phone: {current_order.get('customer_phone')}\n"
+                f"{destination_lines[0]}\n"
+                f"Total: £{total}\n"
+                "Reply YES to confirm or CANCEL to stop."
+            ),
+            "cart": {"items": enriched, "total": total, "status": "checkout"},
+            "needs_admin": False,
+            "order_id": order_id,
+        }
+
+    if state == "checkout_wait_delivery_address":
+        update_order(order_id, delivery_address=text, status="checkout")
+        set_state(session_id, "checkout_confirm", {"order_id": order_id}, store_slug, channel)
+        total, enriched = cart_totals(items)
+        current_order = get_order(order_id)
+        destination_lines = _order_destination_lines(current_order)
+        return {
+            "reply": (
+                "Confirm your order ✅\n"
+                f"Name: {current_order.get('customer_name')}\n"
+                f"Phone: {current_order.get('customer_phone')}\n"
+                f"{destination_lines[0]}\n"
                 f"Total: £{total}\n"
                 f"Reply YES to confirm or CANCEL to stop."
             ),
@@ -144,15 +175,17 @@ def handle_chat(
     if state == "checkout_confirm":
         if t_low in ["yes", "y", "confirm", "ok", "okay", "ok confirm", "confirm yes"]:
             update_order(order_id, status="confirmed")
+            send_new_order_notification(order_id)
             set_state(session_id, "browsing", {}, store_slug, channel)
             total, enriched = cart_totals(items)
             current_order = get_order(order_id)
+            destination_lines = _order_destination_lines(current_order)
             return {
                 "reply": (
                     f"Order confirmed ✅ (Order #{order_id})\n"
-                    f"Pickup: {current_order.get('pickup_time')}\n"
+                    f"{destination_lines[0]}\n"
                     f"Total: £{total}\n"
-                    f"We’ll notify you when it’s ready."
+                    f"We’ll contact you with the next update."
                 ),
                 "cart": {"items": enriched, "total": total, "status": "confirmed"},
                 "needs_admin": False,
@@ -206,9 +239,17 @@ def handle_chat(
                 "needs_admin": False,
                 "order_id": order_id,
             }
-        set_state(session_id, "checkout_wait_pickup_time", {"order_id": order_id}, store_slug, channel)
-        update_order(order_id, status="checkout")
-        return _reply_with_cart(order_id, items, "Great. What pickup time do you want? (e.g., Today 6pm)")
+        set_state(session_id, "checkout_wait_name", {"order_id": order_id}, store_slug, channel)
+        update_order(
+            order_id,
+            status="checkout",
+            fulfillment_type=None,
+            pickup_time=None,
+            delivery_address=None,
+            customer_name=None,
+            customer_phone=None,
+        )
+        return _reply_with_cart(order_id, items, "Great. What’s your name?")
 
     if intent == "CANCEL":
         update_order(order_id, status="cancelled")

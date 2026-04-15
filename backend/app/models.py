@@ -25,6 +25,7 @@ class Store(Base):
     phone = Column(String, nullable=True)
     opening = Column(String, nullable=True)
     whatsapp_number = Column(String, nullable=True)
+    order_notification_number = Column(String, nullable=True)
     whatsapp_enabled = Column(Boolean, nullable=False, default=False)
     whatsapp_provider = Column(String, nullable=False, default="meta")
     whatsapp_phone_number_id = Column(String, nullable=True)

@@ -28,6 +28,7 @@ type ChannelSettings = {
   whatsapp_enabled: boolean;
   whatsapp_provider: string;
   whatsapp_number: string;
+  order_notification_number: string;
   whatsapp_phone_number_id: string;
   whatsapp_bot_id: string;
   whatsapp_verify_token: string;
@@ -559,6 +560,7 @@ export default function AdminProductsPage() {
           whatsapp_enabled: channelSettings.whatsapp_enabled,
           whatsapp_provider: channelSettings.whatsapp_provider,
           whatsapp_number: channelSettings.whatsapp_number,
+          order_notification_number: channelSettings.order_notification_number,
           whatsapp_phone_number_id: channelSettings.whatsapp_phone_number_id,
           whatsapp_bot_id: channelSettings.whatsapp_bot_id,
           whatsapp_verify_token: channelSettings.whatsapp_verify_token,
@@ -653,6 +655,20 @@ export default function AdminProductsPage() {
                 updateChannelField("whatsapp_number", e.target.value)
               }
             />
+
+            <input
+              className="border p-2 rounded"
+              placeholder="Order notification recipient number"
+              value={channelSettings.order_notification_number}
+              onChange={(e) =>
+                updateChannelField("order_notification_number", e.target.value)
+              }
+            />
+
+            <div className="text-sm text-gray-500 md:col-span-2">
+              Admin notification WhatsApp number. Use the owner or staff personal
+              WhatsApp number here, not the AI ordering WhatsApp number.
+            </div>
 
             {isSendPulseProvider ? (
               <input

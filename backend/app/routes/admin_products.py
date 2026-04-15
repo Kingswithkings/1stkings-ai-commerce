@@ -88,6 +88,7 @@ class StoreChannelSettingsUpdate(BaseModel):
     whatsapp_enabled: bool
     whatsapp_provider: str = "meta"
     whatsapp_number: Optional[str] = None
+    order_notification_number: Optional[str] = None
     whatsapp_phone_number_id: Optional[str] = None
     whatsapp_bot_id: Optional[str] = None
     whatsapp_verify_token: Optional[str] = None
@@ -267,6 +268,7 @@ def get_store_settings(
         "whatsapp_enabled": bool(store.whatsapp_enabled),
         "whatsapp_provider": (store.whatsapp_provider or "meta"),
         "whatsapp_number": store.whatsapp_number or store.phone or "",
+        "order_notification_number": store.order_notification_number or "",
         "whatsapp_phone_number_id": store.whatsapp_phone_number_id or "",
         "whatsapp_bot_id": store.whatsapp_bot_id or "",
         "whatsapp_verify_token": store.whatsapp_verify_token or "",
@@ -293,6 +295,7 @@ def update_store_settings(
     store.whatsapp_enabled = payload.whatsapp_enabled
     store.whatsapp_provider = (payload.whatsapp_provider or "meta").strip() or "meta"
     store.whatsapp_number = (payload.whatsapp_number or "").strip() or None
+    store.order_notification_number = (payload.order_notification_number or "").strip() or None
     store.whatsapp_phone_number_id = (
         (payload.whatsapp_phone_number_id or "").strip() or None
     )
@@ -310,6 +313,7 @@ def update_store_settings(
             "whatsapp_enabled": bool(store.whatsapp_enabled),
             "whatsapp_provider": store.whatsapp_provider or "meta",
             "whatsapp_number": store.whatsapp_number or "",
+            "order_notification_number": store.order_notification_number or "",
             "whatsapp_phone_number_id": store.whatsapp_phone_number_id or "",
             "whatsapp_bot_id": store.whatsapp_bot_id or "",
             "whatsapp_verify_token": store.whatsapp_verify_token or "",

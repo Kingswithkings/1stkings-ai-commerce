@@ -9,7 +9,9 @@ type Order = {
   store_slug: string;
   items: string;
   status: string;
+  fulfillment_type?: string | null;
   pickup_time?: string | null;
+  delivery_address?: string | null;
   customer_name?: string | null;
   customer_phone?: string | null;
   flagged: number;
@@ -119,11 +121,18 @@ export default function AdminStorePage({
                     <div style={{ fontSize: 13, opacity: 0.7 }}>
                       Status: {order.status}
                     </div>
+                    <div style={{ fontSize: 13, opacity: 0.7 }}>
+                      Fulfillment: {order.fulfillment_type || "pickup"}
+                    </div>
                   </div>
                   <div style={{ textAlign: "right", fontSize: 13 }}>
                     <div>Customer: {order.customer_name || "—"}</div>
                     <div>Phone: {order.customer_phone || "—"}</div>
-                    <div>Pickup: {order.pickup_time || "—"}</div>
+                    <div>
+                      {order.fulfillment_type === "delivery"
+                        ? `Delivery: ${order.delivery_address || "—"}`
+                        : `Pickup: ${order.pickup_time || "—"}`}
+                    </div>
                   </div>
                 </div>
 
