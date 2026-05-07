@@ -8,6 +8,7 @@ from app.db import (
     set_state,
 )
 from app.catalog import Catalog
+from app.llm import conversational_reply
 from app.order_notifications import send_new_order_notification
 
 
@@ -110,27 +111,81 @@ def handle_chat(
         if channel == "whatsapp":
             update_order(order_id, customer_phone=session_id)
             set_state(session_id, "checkout_wait_fulfillment", {"order_id": order_id}, store_slug, channel)
-            return _reply_with_cart(order_id, items, "Thanks. Do you want delivery or pickup?")
+            return _reply_with_cart(
+                order_id,
+                items,
+                "Thanks. Do you want delivery or pickup?",
+                session_id,
+                text,
+                "checkout_wait_fulfillment",
+                store_slug,
+                channel,
+            )
         set_state(session_id, "checkout_wait_phone", {"order_id": order_id}, store_slug, channel)
-        return _reply_with_cart(order_id, items, "Thanks. What phone number should we contact you on?")
+        return _reply_with_cart(
+            order_id,
+            items,
+            "Thanks. What phone number should we contact you on?",
+            session_id,
+            text,
+            "checkout_wait_phone",
+            store_slug,
+            channel,
+        )
 
     if state == "checkout_wait_phone":
         update_order(order_id, customer_phone=text)
         set_state(session_id, "checkout_wait_fulfillment", {"order_id": order_id}, store_slug, channel)
-        return _reply_with_cart(order_id, items, "Do you want delivery or pickup?")
+        return _reply_with_cart(
+            order_id,
+            items,
+            "Do you want delivery or pickup?",
+            session_id,
+            text,
+            "checkout_wait_fulfillment",
+            store_slug,
+            channel,
+        )
 
     if state == "checkout_wait_fulfillment":
         if t_low in {"pickup", "pick up", "collection", "collect"}:
             update_order(order_id, fulfillment_type="pickup", delivery_address=None)
             set_state(session_id, "checkout_wait_pickup_time", {"order_id": order_id}, store_slug, channel)
-            return _reply_with_cart(order_id, items, "Great. What pickup time do you want? (e.g., Today 6pm)")
+            return _reply_with_cart(
+                order_id,
+                items,
+                "Great. What pickup time do you want? (e.g., Today 6pm)",
+                session_id,
+                text,
+                "checkout_wait_pickup_time",
+                store_slug,
+                channel,
+            )
 
         if t_low in {"delivery", "deliver"}:
             update_order(order_id, fulfillment_type="delivery", pickup_time=None)
             set_state(session_id, "checkout_wait_delivery_address", {"order_id": order_id}, store_slug, channel)
-            return _reply_with_cart(order_id, items, "What delivery address should we use?")
+            return _reply_with_cart(
+                order_id,
+                items,
+                "What delivery address should we use?",
+                session_id,
+                text,
+                "checkout_wait_delivery_address",
+                store_slug,
+                channel,
+            )
 
-        return _reply_with_cart(order_id, items, "Please reply with DELIVERY or PICKUP.")
+        return _reply_with_cart(
+            order_id,
+            items,
+            "Please reply with DELIVERY or PICKUP.",
+            session_id,
+            text,
+            "checkout_wait_fulfillment",
+            store_slug,
+            channel,
+        )
 
     if state == "checkout_wait_pickup_time":
         update_order(order_id, pickup_time=text, status="checkout")
@@ -138,19 +193,28 @@ def handle_chat(
         total, enriched = cart_totals(items)
         current_order = get_order(order_id)
         destination_lines = _order_destination_lines(current_order)
-        return {
-            "reply": (
-                "Confirm your order ✅\n"
-                f"Name: {current_order.get('customer_name')}\n"
-                f"Phone: {current_order.get('customer_phone')}\n"
-                f"{destination_lines[0]}\n"
-                f"Total: £{total}\n"
-                "Reply YES to confirm or CANCEL to stop."
-            ),
-            "cart": {"items": enriched, "total": total, "status": "checkout"},
-            "needs_admin": False,
-            "order_id": order_id,
-        }
+        return _final_result(
+            {
+                "reply": (
+                    "Confirm your order ✅\n"
+                    f"Name: {current_order.get('customer_name')}\n"
+                    f"Phone: {current_order.get('customer_phone')}\n"
+                    f"{destination_lines[0]}\n"
+                    f"Total: £{total}\n"
+                    "Reply YES to confirm or CANCEL to stop."
+                ),
+                "cart": {"items": enriched, "total": total, "status": "checkout"},
+                "needs_admin": False,
+                "order_id": order_id,
+            },
+            session_id,
+            text,
+            state,
+            order,
+            items,
+            store_slug,
+            channel,
+        )
 
     if state == "checkout_wait_delivery_address":
         update_order(order_id, delivery_address=text, status="checkout")
@@ -158,19 +222,28 @@ def handle_chat(
         total, enriched = cart_totals(items)
         current_order = get_order(order_id)
         destination_lines = _order_destination_lines(current_order)
-        return {
-            "reply": (
-                "Confirm your order ✅\n"
-                f"Name: {current_order.get('customer_name')}\n"
-                f"Phone: {current_order.get('customer_phone')}\n"
-                f"{destination_lines[0]}\n"
-                f"Total: £{total}\n"
-                f"Reply YES to confirm or CANCEL to stop."
-            ),
-            "cart": {"items": enriched, "total": total, "status": "checkout"},
-            "needs_admin": False,
-            "order_id": order_id,
-        }
+        return _final_result(
+            {
+                "reply": (
+                    "Confirm your order ✅\n"
+                    f"Name: {current_order.get('customer_name')}\n"
+                    f"Phone: {current_order.get('customer_phone')}\n"
+                    f"{destination_lines[0]}\n"
+                    f"Total: £{total}\n"
+                    f"Reply YES to confirm or CANCEL to stop."
+                ),
+                "cart": {"items": enriched, "total": total, "status": "checkout"},
+                "needs_admin": False,
+                "order_id": order_id,
+            },
+            session_id,
+            text,
+            state,
+            order,
+            items,
+            store_slug,
+            channel,
+        )
 
     if state == "checkout_confirm":
         if t_low in ["yes", "y", "confirm", "ok", "okay", "ok confirm", "confirm yes"]:
@@ -180,65 +253,136 @@ def handle_chat(
             total, enriched = cart_totals(items)
             current_order = get_order(order_id)
             destination_lines = _order_destination_lines(current_order)
-            return {
-                "reply": (
-                    f"Order confirmed ✅ (Order #{order_id})\n"
-                    f"{destination_lines[0]}\n"
-                    f"Total: £{total}\n"
-                    f"We’ll contact you with the next update."
-                ),
-                "cart": {"items": enriched, "total": total, "status": "confirmed"},
-                "needs_admin": False,
-                "order_id": order_id,
-            }
+            return _final_result(
+                {
+                    "reply": (
+                        f"Order confirmed ✅ (Order #{order_id})\n"
+                        f"{destination_lines[0]}\n"
+                        f"Total: £{total}\n"
+                        f"We’ll contact you with the next update."
+                    ),
+                    "cart": {"items": enriched, "total": total, "status": "confirmed"},
+                    "needs_admin": False,
+                    "order_id": order_id,
+                },
+                session_id,
+                text,
+                state,
+                order,
+                items,
+                store_slug,
+                channel,
+            )
 
         if "cancel" in t_low:
             update_order(order_id, status="cancelled")
             set_state(session_id, "browsing", {}, store_slug, channel)
-            return {
-                "reply": "Cancelled. If you want to start again, just type what you need.",
-                "cart": None,
-                "needs_admin": False,
-                "order_id": order_id,
-            }
+            return _final_result(
+                {
+                    "reply": "Cancelled. If you want to start again, just type what you need.",
+                    "cart": None,
+                    "needs_admin": False,
+                    "order_id": order_id,
+                },
+                session_id,
+                text,
+                state,
+                order,
+                items,
+                store_slug,
+                channel,
+            )
 
         total, enriched = cart_totals(items)
-        return {
-            "reply": f"Reply YES to confirm or CANCEL to stop. Total £{total}.",
-            "cart": {"items": enriched, "total": total, "status": "checkout"},
-            "needs_admin": False,
-            "order_id": order_id,
-        }
+        return _final_result(
+            {
+                "reply": f"Reply YES to confirm or CANCEL to stop. Total £{total}.",
+                "cart": {"items": enriched, "total": total, "status": "checkout"},
+                "needs_admin": False,
+                "order_id": order_id,
+            },
+            session_id,
+            text,
+            state,
+            order,
+            items,
+            store_slug,
+            channel,
+        )
 
     # Normal intents
-    from app.nlu import detect_intent, extract_items, parse_remove_command
+    from app.nlu import detect_intent, extract_items, parse_remove_command, is_general_query
 
     intent = detect_intent(text)
 
     if intent == "VIEW_CART":
         total, enriched = cart_totals(items)
         if not items:
-            return {
-                "reply": "Your cart is empty. Type what you want to buy.",
-                "cart": {"items": [], "total": 0.0, "status": "draft"},
+            return _final_result(
+                {
+                    "reply": "Your cart is empty. Type what you want to buy.",
+                    "cart": {"items": [], "total": 0.0, "status": "draft"},
+                    "needs_admin": False,
+                    "order_id": order_id,
+                },
+                session_id,
+                text,
+                state,
+                order,
+                items,
+                store_slug,
+                channel,
+            )
+        return _final_result(
+            {
+                "reply": f"Here’s your cart 🛒 Total £{total}. Type CHECKOUT to finish.",
+                "cart": {"items": enriched, "total": total, "status": order["status"]},
                 "needs_admin": False,
                 "order_id": order_id,
-            }
-        return {
-            "reply": f"Here’s your cart 🛒 Total £{total}. Type CHECKOUT to finish.",
-            "cart": {"items": enriched, "total": total, "status": order["status"]},
-            "needs_admin": False,
-            "order_id": order_id,
-        }
+            },
+            session_id,
+            text,
+            state,
+            order,
+            items,
+            store_slug,
+            channel,
+        )
 
     if intent == "CHECKOUT":
         if not items:
-            return {
-                "reply": "Your cart is empty. Add items first.",
-                "cart": {"items": [], "total": 0.0, "status": "draft"},
-                "needs_admin": False,
-                "order_id": order_id,
-            }
+            if is_general_query(text):
+                return _final_result(
+                    {
+                        "reply": "Let me answer that for you.",
+                        "cart": {"items": [], "total": 0.0, "status": "draft"},
+                        "needs_admin": False,
+                        "order_id": order_id,
+                    },
+                    session_id,
+                    text,
+                    state,
+                    order,
+                    items,
+                    store_slug,
+                    channel,
+                    direct=True,
+                )
+            return _final_result(
+                {
+                    "reply": "Your cart is empty. Add items first.",
+                    "cart": {"items": [], "total": 0.0, "status": "draft"},
+                    "needs_admin": False,
+                    "order_id": order_id,
+                },
+                session_id,
+                text,
+                state,
+                order,
+                items,
+                store_slug,
+                channel,
+            )
         set_state(session_id, "checkout_wait_name", {"order_id": order_id}, store_slug, channel)
         update_order(
             order_id,
@@ -249,17 +393,35 @@ def handle_chat(
             customer_name=None,
             customer_phone=None,
         )
-        return _reply_with_cart(order_id, items, "Great. What’s your name?")
+        return _reply_with_cart(
+            order_id,
+            items,
+            "Great. What’s your name?",
+            session_id,
+            text,
+            "checkout_wait_name",
+            store_slug,
+            channel,
+        )
 
     if intent == "CANCEL":
         update_order(order_id, status="cancelled")
         set_state(session_id, "browsing", {}, store_slug, channel)
-        return {
-            "reply": "Cancelled. If you want to start again, type what you need.",
-            "cart": None,
-            "needs_admin": False,
-            "order_id": order_id,
-        }
+        return _final_result(
+            {
+                "reply": "Cancelled. If you want to start again, type what you need.",
+                "cart": None,
+                "needs_admin": False,
+                "order_id": order_id,
+            },
+            session_id,
+            text,
+            state,
+            order,
+            items,
+            store_slug,
+            channel,
+        )
 
     if intent == "REMOVE":
         q, dec = parse_remove_command(text)
@@ -267,21 +429,57 @@ def handle_chat(
         total, enriched = cart_totals(new_items)
 
         if not changed:
-            return {
-                "reply": f"{msg} Try: 'remove rice' or 'remove 2 rice'.",
+            return _final_result(
+                {
+                    "reply": f"{msg} Try: 'remove rice' or 'remove 2 rice'.",
+                    "cart": {"items": enriched, "total": total, "status": order["status"]},
+                    "needs_admin": False,
+                    "order_id": order_id,
+                },
+                session_id,
+                text,
+                state,
+                order,
+                items,
+                store_slug,
+                channel,
+            )
+
+        return _final_result(
+            {
+                "reply": f"{msg} New total £{total}.",
                 "cart": {"items": enriched, "total": total, "status": order["status"]},
                 "needs_admin": False,
                 "order_id": order_id,
-            }
-
-        return {
-            "reply": f"{msg} New total £{total}.",
-            "cart": {"items": enriched, "total": total, "status": order["status"]},
-            "needs_admin": False,
-            "order_id": order_id,
-        }
+            },
+            session_id,
+            text,
+            state,
+            order,
+            items,
+            store_slug,
+            channel,
+        )
 
     # ADD_OR_SEARCH
+    if intent == "ADD_OR_SEARCH" and is_general_query(text):
+        return _final_result(
+            {
+                "reply": "Let me answer that for you.",
+                "cart": {"items": items, "total": cart_totals(items)[0], "status": order["status"]},
+                "needs_admin": False,
+                "order_id": order_id,
+            },
+            session_id,
+            text,
+            state,
+            order,
+            items,
+            store_slug,
+            channel,
+            direct=True,
+        )
+
     parsed = extract_items(text)
     matched_new = []
     needs_admin = False
@@ -324,35 +522,122 @@ def handle_chat(
     total, enriched = cart_totals(items)
 
     if needs_admin and not matched_new and clarifications:
-        return {
-            "reply": "I need a bit more detail:\n- " + "\n- ".join(clarifications) + "\n\nOr type 'show cart' / 'checkout'.",
-            "cart": {"items": enriched, "total": total, "status": order["status"]},
-            "needs_admin": True,
-            "order_id": order_id,
-        }
+        if is_general_query(text):
+            return _final_result(
+                {
+                    "reply": "Let me answer that for you.",
+                    "cart": {"items": enriched, "total": total, "status": order["status"]},
+                    "needs_admin": False,
+                    "order_id": order_id,
+                },
+                session_id,
+                text,
+                state,
+                order,
+                items,
+                store_slug,
+                channel,
+                direct=True,
+            )
+        return _final_result(
+            {
+                "reply": "I need a bit more detail:\n- " + "\n- ".join(clarifications) + "\n\nOr type 'show cart' / 'checkout'.",
+                "cart": {"items": enriched, "total": total, "status": order["status"]},
+                "needs_admin": True,
+                "order_id": order_id,
+            },
+            session_id,
+            text,
+            state,
+            order,
+            items,
+            store_slug,
+            channel,
+        )
 
     note = ("\n\nNotes:\n- " + "\n- ".join(clarifications)) if clarifications else ""
 
     if not items:
-        return {
-            "reply": "Tell me what you want to buy.",
-            "cart": {"items": [], "total": 0.0, "status": "draft"},
-            "needs_admin": False,
+        return _final_result(
+            {
+                "reply": "Tell me what you want to buy.",
+                "cart": {"items": [], "total": 0.0, "status": "draft"},
+                "needs_admin": False,
+                "order_id": order_id,
+            },
+            session_id,
+            text,
+            state,
+            order,
+            items,
+            store_slug,
+            channel,
+        )
+
+    return _final_result(
+        {
+            "reply": f"Added ✅. Cart total £{total}. Type 'show cart' or 'checkout' to finish.{note}",
+            "cart": {"items": enriched, "total": total, "status": order["status"]},
+            "needs_admin": bool(flagged),
             "order_id": order_id,
-        }
+        },
+        session_id,
+        text,
+        state,
+        order,
+        items,
+        store_slug,
+        channel,
+    )
 
-    return {
-        "reply": f"Added ✅. Cart total £{total}. Type 'show cart' or 'checkout' to finish.{note}",
-        "cart": {"items": enriched, "total": total, "status": order["status"]},
-        "needs_admin": bool(flagged),
-        "order_id": order_id,
-    }
+
+def _final_result(
+    result: dict,
+    session_id: str,
+    user_text: str,
+    state: str,
+    order: dict,
+    items: list[dict],
+    store_slug: str,
+    channel: str = "web",
+    direct: bool = False,
+) -> dict:
+    if result.get("reply"):
+        result["reply"] = conversational_reply(
+            session_id=session_id,
+            user_text=user_text,
+            raw_reply=result["reply"],
+            state=state,
+            items=items,
+            store_slug=store_slug,
+            channel=channel,
+            direct=direct,
+        )
+    return result
 
 
-def _reply_with_cart(order_id: int, items: list[dict], msg: str) -> dict:
+def _reply_with_cart(
+    order_id: int,
+    items: list[dict],
+    msg: str,
+    session_id: str,
+    user_text: str,
+    state: str,
+    store_slug: str,
+    channel: str = "web",
+) -> dict:
     total, enriched = cart_totals(items)
+    reply = conversational_reply(
+        session_id=session_id,
+        user_text=user_text,
+        raw_reply=msg,
+        state=state,
+        items=items,
+        store_slug=store_slug,
+        channel=channel,
+    )
     return {
-        "reply": msg,
+        "reply": reply,
         "cart": {"items": enriched, "total": total, "status": get_order(order_id)["status"]},
         "needs_admin": False,
         "order_id": order_id,

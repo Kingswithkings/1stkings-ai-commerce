@@ -25,7 +25,10 @@ WHATSAPP_API_VERSION=v22.0
 # SendPulse
 SENDPULSE_API_ID=your_sendpulse_api_id
 SENDPULSE_API_SECRET=your_sendpulse_api_secret
-```
+
+# Optional LLM support
+OPENAI_API_KEY=your_openai_api_key
+OPENAI_MODEL=gpt-3.5-turbo
 
 Each store can also be configured in the `stores` table with:
 

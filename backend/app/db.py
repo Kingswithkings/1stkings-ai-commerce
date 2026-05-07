@@ -413,6 +413,35 @@ def log_message(
         )
 
 
+def get_recent_messages(
+    session_id: str,
+    store_slug: str,
+    channel: str = "web",
+    limit: int = 10,
+) -> list[dict]:
+    with engine.connect() as conn:
+        rows = conn.execute(
+            text(
+                """
+                SELECT role, text
+                FROM messages
+                WHERE session_id = :session_id
+                  AND store_slug = :store_slug
+                  AND channel = :channel
+                ORDER BY id ASC
+                LIMIT :limit
+                """
+            ),
+            {
+                "session_id": session_id,
+                "store_slug": store_slug,
+                "channel": channel,
+                "limit": limit,
+            },
+        ).mappings().all()
+    return [dict(row) for row in rows]
+
+
 def list_orders_by_store(store_slug: str) -> list[dict]:
     with engine.connect() as conn:
         rows = conn.execute(

@@ -27,6 +27,42 @@ def detect_intent(text: str) -> str:
     return "ADD_OR_SEARCH"
 
 
+def is_general_query(text: str) -> bool:
+    t = (text or "").lower().strip()
+    if not t:
+        return False
+
+    if "?" in t:
+        return True
+
+    general_starts = [
+        "what",
+        "who",
+        "when",
+        "where",
+        "why",
+        "how",
+        "tell me",
+        "explain",
+        "define",
+        "can you",
+        "do you",
+        "is it",
+        "are there",
+        "hello",
+        "hi",
+        "hey",
+        "good morning",
+        "good afternoon",
+        "good evening",
+        "tell me a",
+        "give me",
+        "i need",
+        "i want",
+    ]
+    return any(t.startswith(prefix) for prefix in general_starts)
+
+
 # -------------------------
 # ADD parsing
 # -------------------------
